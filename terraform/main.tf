@@ -1,10 +1,13 @@
 # ============================================================
-# KubeOps-Aegis: Azure Production Infrastructure (Terraform)
-# Resource Group, VNet, Subnets, NAT Gateway & Network Security Groups
+# KubeOps-Aegis: Azure Modular Infrastructure (Terraform)
+# Resource Groups, VNet, Subnets, NAT Gateway, NSGs, Private Endpoints
 # ============================================================
 
 terraform {
-  required_version = ">= 1.14.0"
+  required_version = ">= 1.9.0"
+
+  # Dynamic Azure Blob Remote Backend (initialized via GitHub Actions -backend-config)
+  backend "azurerm" {}
 
   required_providers {
     azurerm = {
@@ -19,10 +22,6 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
     }
-    kubectl = {
-      source  = "gavinbunney/kubectl"
-      version = "~> 1.14"
-    }
   }
 }
 
@@ -34,142 +33,80 @@ provider "azurerm" {
   }
 }
 
-# 1. Primary Azure Resource Group
-resource "azurerm_resource_group" "rg" {
-  name     = var.resource_group_name
+# 1. Functional Resource Groups
+resource "azurerm_resource_group" "rg_network" {
+  name     = "${var.prefix}-rg-network-${var.environment}"
   location = var.location
-
-  tags = {
-    Project     = "KubeOps-Aegis-Azure"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
+  tags     = var.tags
 }
 
-# 2. Virtual Network (VNet)
-resource "azurerm_virtual_network" "vnet" {
-  name                = "${var.cluster_name}-vnet"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  address_space       = [var.vnet_cidr]
-
-  tags = azurerm_resource_group.rg.tags
+resource "azurerm_resource_group" "rg_compute" {
+  name     = "${var.prefix}-rg-compute-${var.environment}"
+  location = var.location
+  tags     = var.tags
 }
 
-# 3. Subnets (AKS System Subnet, Workload Subnet, Ingress Subnet)
-resource "azurerm_subnet" "aks_system_subnet" {
-  name                 = "aks-system-subnet"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.100.1.0/24"]
+resource "azurerm_resource_group" "rg_data" {
+  name     = "${var.prefix}-rg-data-${var.environment}"
+  location = var.location
+  tags     = var.tags
 }
 
-resource "azurerm_subnet" "aks_user_subnet" {
-  name                 = "aks-user-subnet"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.100.2.0/24"]
+resource "azurerm_resource_group" "rg_ops" {
+  name     = "${var.prefix}-rg-ops-${var.environment}"
+  location = var.location
+  tags     = var.tags
 }
 
-resource "azurerm_subnet" "ingress_subnet" {
-  name                 = "ingress-subnet"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.100.3.0/24"]
+# 2. VNet & Subnets Module
+module "vnet" {
+  source              = "./modules/vnet"
+  vnet_name           = "${var.prefix}-vnet-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_network.name
+  vnet_cidr           = var.vnet_cidr
+  tags                = var.tags
 }
 
-# 4. Azure NAT Gateway & Public IP (Secure Outbound Internet Egress)
-resource "azurerm_public_ip" "nat_pip" {
-  name                = "${var.cluster_name}-nat-pip"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-
-  tags = azurerm_resource_group.rg.tags
+# 3. NAT Gateway Module
+module "nat_gateway" {
+  source              = "./modules/nat_gateway"
+  nat_gateway_name    = "${var.prefix}-nat-gw-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_network.name
+  subnet_ids          = [module.vnet.aks_system_subnet_id, module.vnet.aks_user_subnet_id]
+  tags                = var.tags
 }
 
-resource "azurerm_nat_gateway" "nat_gw" {
-  name                    = "${var.cluster_name}-nat-gw"
-  location                = azurerm_resource_group.rg.location
-  resource_group_name     = azurerm_resource_group.rg.name
-  sku_name                = "Standard"
-  idle_timeout_in_minutes = 10
-
-  tags = azurerm_resource_group.rg.tags
+# 4. Azure Storage & Private Endpoint Module
+module "storage" {
+  source                     = "./modules/storage"
+  storage_account_name       = "${var.prefix}st${var.environment}"
+  location                   = var.location
+  resource_group_name        = azurerm_resource_group.rg_data.name
+  vnet_id                    = module.vnet.vnet_id
+  private_endpoint_subnet_id = module.vnet.private_endpoints_subnet_id
+  tags                       = var.tags
 }
 
-resource "azurerm_nat_gateway_public_ip_association" "nat_pip_assoc" {
-  nat_gateway_id       = azurerm_nat_gateway.nat_gw.id
-  public_ip_address_id = azurerm_public_ip.nat_pip.id
+# 5. Azure Key Vault & Private Endpoint Module
+module "keyvault" {
+  source                     = "./modules/keyvault"
+  keyvault_name              = "${var.prefix}-kv-${var.environment}"
+  location                   = var.location
+  resource_group_name        = azurerm_resource_group.rg_data.name
+  vnet_id                    = module.vnet.vnet_id
+  private_endpoint_subnet_id = module.vnet.private_endpoints_subnet_id
+  tags                       = var.tags
 }
 
-# Associate NAT Gateway with AKS Subnets
-resource "azurerm_subnet_nat_gateway_association" "system_subnet_nat" {
-  subnet_id      = azurerm_subnet.aks_system_subnet.id
-  nat_gateway_id = azurerm_nat_gateway.nat_gw.id
-}
-
-resource "azurerm_subnet_nat_gateway_association" "user_subnet_nat" {
-  subnet_id      = azurerm_subnet.aks_user_subnet.id
-  nat_gateway_id = azurerm_nat_gateway.nat_gw.id
-}
-
-# 5. Network Security Group (NSG) with Strict Security Protocols
-resource "azurerm_network_security_group" "aks_nsg" {
-  name                = "${var.cluster_name}-nsg"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  # Security Rule 1: Allow HTTPS Inbound
-  security_rule {
-    name                       = "AllowHTTPSInbound"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "443"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  # Security Rule 2: Allow Internal VNet Traffic
-  security_rule {
-    name                       = "AllowVNetInbound"
-    priority                   = 110
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "VirtualNetwork"
-    destination_address_prefix = "VirtualNetwork"
-  }
-
-  # Security Rule 3: Deny All Other Inbound Traffic
-  security_rule {
-    name                       = "DenyAllInbound"
-    priority                   = 4096
-    direction                  = "Inbound"
-    access                     = "Deny"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  tags = azurerm_resource_group.rg.tags
-}
-
-# Associate NSG with Subnets
-resource "azurerm_subnet_network_security_group_association" "system_nsg_assoc" {
-  subnet_id                 = azurerm_subnet.aks_system_subnet.id
-  network_security_group_id = azurerm_network_security_group.aks_nsg.id
-}
-
-resource "azurerm_subnet_network_security_group_association" "user_nsg_assoc" {
-  subnet_id                 = azurerm_subnet.aks_user_subnet.id
-  network_security_group_id = azurerm_network_security_group.aks_nsg.id
+# 6. Neo4j Graph Database Module
+module "neo4j" {
+  source               = "./modules/neo4j"
+  neo4j_instance_name  = "${var.prefix}-vm-neo4j-${var.environment}"
+  location             = var.location
+  resource_group_name  = azurerm_resource_group.rg_data.name
+  subnet_id            = module.vnet.neo4j_subnet_id
+  admin_password       = var.db_password
+  tags                 = var.tags
 }
