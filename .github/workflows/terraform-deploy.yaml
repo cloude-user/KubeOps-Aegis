@@ -1,0 +1,186 @@
+name: Azure Terraform Infrastructure Manual Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Select Terraform Action to execute'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: 'Select Deployment Environment'
+        required: true
+        default: 'prd'
+        type: choice
+        options:
+          - prd
+          - dev
+
+permissions:
+  id-token: write # Required for Azure Entra ID OIDC authentication
+  contents: read
+
+jobs:
+  # ============================================================
+  # JOB 1: TERRAFORM SECURITY LINT & PLAN
+  # ============================================================
+  terraform-plan:
+    name: 🔍 Trivy Security Scan & Terraform Plan
+    if: ${{ github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply' }}
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: 🛡️ Trivy Open-Source IaC Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'terraform/'
+          exit-code: '0' # Log security vulnerabilities without failing build
+          severity: 'HIGH,CRITICAL'
+
+      - name: Terraform Format Check
+        run: |
+          cd terraform
+          terraform fmt -check
+
+      - name: Terraform Init (Azure Blob State Backend)
+        run: |
+          cd terraform
+          terraform init \
+            -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}" \
+            -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate" \
+            -backend-config="use_oidc=true"
+
+      - name: Terraform Plan
+        run: |
+          cd terraform
+          terraform plan -var-file="env/${{ github.event.inputs.environment }}.tfvars" -out=tfplan
+
+      - name: Save Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.event.inputs.environment }}
+          path: terraform/tfplan
+          retention-days: 1
+
+  # ============================================================
+  # JOB 2: TERRAFORM APPLY (Manual Action)
+  # ============================================================
+  terraform-apply:
+    name: 🚀 Terraform Apply
+    needs: terraform-plan
+    if: ${{ github.event.inputs.action == 'apply' }}
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Init (Azure Blob State Backend)
+        run: |
+          cd terraform
+          terraform init \
+            -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}" \
+            -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate" \
+            -backend-config="use_oidc=true"
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ github.event.inputs.environment }}
+          path: terraform/
+
+      - name: Terraform Apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve tfplan
+
+  # ============================================================
+  # JOB 3: TERRAFORM DESTROY (Optional Safety Clean)
+  # ============================================================
+  terraform-destroy:
+    name: 💥 Terraform Destroy
+    if: ${{ github.event.inputs.action == 'destroy' }}
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Init (Azure Blob State Backend)
+        run: |
+          cd terraform
+          terraform init \
+            -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}" \
+            -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate" \
+            -backend-config="use_oidc=true"
+
+      - name: Terraform Destroy
+        run: |
+          cd terraform
+          terraform destroy -var-file="env/${{ github.event.inputs.environment }}.tfvars" -auto-approve
