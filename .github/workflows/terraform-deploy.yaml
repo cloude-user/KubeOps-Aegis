@@ -60,7 +60,7 @@ jobs:
         with:
           scan-type: 'config'
           scan-ref: 'terraform/'
-          exit-code: '0' # Log security vulnerabilities without failing build
+          exit-code: '0'
           severity: 'HIGH,CRITICAL'
 
       - name: Terraform Format Check
