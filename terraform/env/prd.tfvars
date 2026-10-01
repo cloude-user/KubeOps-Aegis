@@ -13,9 +13,9 @@ resource_group_name = "rg-kubeops-aegis-prd"
 cluster_name        = "aks-kubeops-aegis-prd"
 environment         = "prd"
 kubernetes_version  = "1.30.0"
- 
+
 # Networking Configuration
-vnet_cidr           = "10.100.0.0/16"
+vnet_cidr = "10.100.0.0/16"
 
 # Node Pool Sizing (Applies when deploy_aks = true)
 system_node_vm_size     = "Standard_D2s_v5"
