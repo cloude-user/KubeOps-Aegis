@@ -1,4 +1,5 @@
-# =============================================================ƒ KubeOps-Aegis: Production Environment Variables (prd.tfvars)
+# =============================================================
+# KubeOps-Aegis: Production Environment Variables (prd.tfvars)
 # =============================================================
 
 # Feature Toggles (Phase 1: Deploy Networking Only Today)
