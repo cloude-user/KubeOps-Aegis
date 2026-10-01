@@ -102,7 +102,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "user_workloads" {
 
 # Provider configurations for Kubernetes, Helm, & Kubectl on AKS
 provider "kubernetes" {
-  host                   = try(azurerm_kubernetes_cluster.aks[0].kube_config[0].host, "")
+  host                   = try(azurerm_kubernetes_cluster.aks[0].kube_config[0].host, "https://127.0.0.1:443")
   client_certificate     = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].client_certificate), "")
   client_key             = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].client_key), "")
   cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].cluster_ca_certificate), "")
@@ -110,7 +110,7 @@ provider "kubernetes" {
 
 provider "helm" {
   kubernetes {
-    host                   = try(azurerm_kubernetes_cluster.aks[0].kube_config[0].host, "")
+    host                   = try(azurerm_kubernetes_cluster.aks[0].kube_config[0].host, "https://127.0.0.1:443")
     client_certificate     = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].client_certificate), "")
     client_key             = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].client_key), "")
     cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].cluster_ca_certificate), "")
@@ -118,7 +118,7 @@ provider "helm" {
 }
 
 provider "kubectl" {
-  host                   = try(azurerm_kubernetes_cluster.aks[0].kube_config[0].host, "")
+  host                   = try(azurerm_kubernetes_cluster.aks[0].kube_config[0].host, "https://127.0.0.1:443")
   client_certificate     = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].client_certificate), "")
   client_key             = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].client_key), "")
   cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.aks[0].kube_config[0].cluster_ca_certificate), "")
