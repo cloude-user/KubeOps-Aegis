@@ -1,0 +1,27 @@
+# ============================================================
+# Kubernetes Ingress Controller Manifest
+# Maps incoming HTTP traffic to backend-service via NGINX Ingress
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: app-prod
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "15"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "15"
+spec:
+  rules:
+    - host: aegis-app.eastus.cloudapp.azure.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 80

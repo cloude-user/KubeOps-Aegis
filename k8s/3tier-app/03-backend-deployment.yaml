@@ -1,0 +1,74 @@
+# ============================================================
+# 3-Tier App Tier 2: Backend Microservice Deployment & Service
+# Includes Prometheus metric annotations & probes
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-api
+  namespace: app-prod
+  labels:
+    app: backend-api
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-api
+  template:
+    metadata:
+      labels:
+        app: backend-api
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: backend-api
+          image: kubeopsaegisacrprd.azurecr.io/backend-api:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://orderuser:P%40ssw0rdOrderDB2026!@postgres-service.app-prod.svc:5432/orderdb"
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: app-prod
+  labels:
+    app: backend-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: backend-api
