@@ -25,7 +25,12 @@ resource "azurerm_linux_virtual_machine" "neo4j_vm" {
   admin_username      = var.admin_username
 
   admin_password                  = var.admin_password
-  disable_password_authentication = false
+  disable_password_authentication = true
+
+  admin_ssh_key {
+    username   = var.admin_username
+    public_key = var.ssh_public_key
+  }
 
   network_interface_ids = [
     azurerm_network_interface.neo4j_nic.id

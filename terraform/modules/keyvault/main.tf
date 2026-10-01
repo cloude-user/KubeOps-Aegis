@@ -17,6 +17,13 @@ resource "azurerm_key_vault" "kv" {
 
   public_network_access_enabled = false
 
+  network_acls {
+    bypass                     = "AzureServices"
+    default_action             = "Deny"
+    ip_rules                   = []
+    virtual_network_subnet_ids = []
+  }
+
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
     object_id = data.azurerm_client_config.current.object_id

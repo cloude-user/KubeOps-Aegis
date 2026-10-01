@@ -3,6 +3,7 @@
 # ============================================================
 
 resource "helm_release" "kube_prometheus_stack" {
+  count            = (var.deploy_aks && var.deploy_gitops_monitoring) ? 1 : 0
   name             = "kube-prometheus-stack"
   repository       = "https://prometheus-community.github.io/helm-charts"
   chart            = "kube-prometheus-stack"

@@ -3,6 +3,7 @@
 # ============================================================
 
 resource "helm_release" "argocd" {
+  count            = (var.deploy_aks && var.deploy_gitops_monitoring) ? 1 : 0
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
