@@ -88,7 +88,7 @@ module "nat_gateway" {
 module "storage" {
   count                      = var.deploy_data_layer && var.deploy_networking ? 1 : 0
   source                     = "./modules/storage"
-  storage_account_name       = "${var.prefix}st${var.environment}"
+  storage_account_name       = "${replace(var.prefix, "-", "")}st${var.environment}" # e.g. kubeopsaegisstprd
   location                   = var.location
   resource_group_name        = azurerm_resource_group.rg_data.name
   vnet_id                    = module.vnet[0].vnet_id
