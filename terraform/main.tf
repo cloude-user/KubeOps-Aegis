@@ -118,6 +118,8 @@ module "postgresql" {
   subnet_id           = module.vnet[0].database_subnet_id
   vnet_id             = module.vnet[0].vnet_id
   admin_password      = var.db_password
+  sku_name            = var.db_sku_name
+  postgres_version    = var.db_version
   tags                = var.tags
 }
 

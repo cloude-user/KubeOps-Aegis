@@ -41,6 +41,12 @@ variable "sku_name" {
   default     = "GP_Standard_D2s_v3"
 }
 
+variable "postgres_version" {
+  type        = string
+  description = "PostgreSQL Major Engine Version"
+  default     = "16"
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags map"

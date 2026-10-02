@@ -16,6 +16,10 @@ cluster_name        = "aks-kubeops-aegis-prd"
 environment         = "prd"
 kubernetes_version  = "1.30.0"
 
+# Database Configuration
+db_sku_name = "GP_Standard_D2s_v3"
+db_version  = "16"
+
 # Networking Configuration
 vnet_cidr = "10.100.0.0/16"
 

@@ -101,6 +101,18 @@ variable "db_password" {
   default     = "P@ssw0rdAegis2026!Secure"
 }
 
+variable "db_sku_name" {
+  type        = string
+  description = "SKU Name for PostgreSQL Flexible Server"
+  default     = "GP_Standard_D2s_v3"
+}
+
+variable "db_version" {
+  type        = string
+  description = "PostgreSQL Major Engine Version"
+  default     = "16"
+}
+
 variable "tags" {
   type        = map(string)
   description = "Resource tags"
