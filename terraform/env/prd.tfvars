@@ -10,7 +10,7 @@ deploy_aks               = false
 deploy_gitops_monitoring = false
 
 # General Azure Configuration
-location            = "eastus"
+location            = "eastasia"
 resource_group_name = "rg-kubeops-aegis-prd"
 cluster_name        = "aks-kubeops-aegis-prd"
 environment         = "prd"
