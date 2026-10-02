@@ -22,7 +22,7 @@ variable "subnet_id" {
 variable "vm_size" {
   type        = string
   description = "VM Size for Neo4j Graph DB"
-  default     = "Standard_D2s_v5"
+  default     = "Standard_B2s"
 }
 
 variable "admin_username" {
