@@ -2,9 +2,10 @@
 # KubeOps-Aegis: Production Environment Variables (prd.tfvars)
 # =============================================================
 
-# Feature Toggles (Phase 1: Deploy Networking Only Today)
+# Feature Toggles
 deploy_networking        = true
 deploy_data_layer        = true
+deploy_neo4j             = false
 deploy_aks               = false
 deploy_gitops_monitoring = false
 

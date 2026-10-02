@@ -132,6 +132,12 @@ variable "deploy_aks" {
   default     = true
 }
 
+variable "deploy_neo4j" {
+  type        = bool
+  description = "Enable deployment of Neo4j VM instance"
+  default     = false
+}
+
 variable "deploy_gitops_monitoring" {
   type        = bool
   description = "Enable deployment of ArgoCD & Prometheus Helm stacks inside AKS"

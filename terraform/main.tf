@@ -123,7 +123,7 @@ module "postgresql" {
 
 # 7. Neo4j Graph Database Module
 module "neo4j" {
-  count               = var.deploy_data_layer && var.deploy_networking ? 1 : 0
+  count               = var.deploy_data_layer && var.deploy_networking && var.deploy_neo4j ? 1 : 0
   source              = "./modules/neo4j"
   neo4j_instance_name = "${var.prefix}-vm-neo4j-${var.environment}"
   location            = var.location
