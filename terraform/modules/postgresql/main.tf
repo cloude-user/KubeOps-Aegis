@@ -20,6 +20,10 @@ resource "azurerm_postgresql_flexible_server" "psql" {
   backup_retention_days = 7
 
   tags = var.tags
+
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.dns_vnet_link
+  ]
 }
 
 resource "azurerm_postgresql_flexible_server_database" "db" {
