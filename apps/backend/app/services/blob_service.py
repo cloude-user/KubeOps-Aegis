@@ -2,9 +2,6 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
 from apps.backend.app.config import settings
 
 logger = logging.getLogger("backend.blob_service")
@@ -13,21 +10,23 @@ logger = logging.getLogger("backend.blob_service")
 class AzureBlobService:
     def __init__(self):
         self.account_name = settings.AZURE_STORAGE_ACCOUNT_NAME
-        self._client: Optional[BlobServiceClient] = None
+        self._client = None
 
-    def _get_client(self) -> Optional[BlobServiceClient]:
+    def _get_client(self):
         if self._client:
             return self._client
         if not self.account_name:
             return None
         try:
+            from azure.identity import DefaultAzureCredential
+            from azure.storage.blob import BlobServiceClient
             account_url = f"https://{self.account_name}.blob.core.windows.net"
             credential = DefaultAzureCredential()
             self._client = BlobServiceClient(account_url=account_url, credential=credential)
             logger.info("Initialized Azure BlobServiceClient for %s", account_url)
             return self._client
         except Exception as e:
-            logger.warning("Could not connect to Azure Blob Storage: %s", e)
+            logger.warning("Could not connect to Azure Blob Storage (running in local simulation mode): %s", e)
             return None
 
     def _upload_file_sync(self, container_name: str, filename: str, file_data: bytes, content_type: str = "application/pdf") -> str:

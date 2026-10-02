@@ -3,107 +3,121 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Agentic_State_Machine-00f2fe?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
 [![Kubernetes](https://img.shields.io/badge/AKS-Azure_Kubernetes-0089D6?style=for-the-badge&logo=microsoftazure&logoColor=white)](https://azure.microsoft.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![ArgoCD](https://img.shields.io/badge/ArgoCD-GitOps_Auto_Sync-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)](https://argoproj.github.io/argo-cd/)
 [![Terraform](https://img.shields.io/badge/Terraform-Azure_AKS_IaC-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](https://terraform.io)
-[![Prometheus](https://img.shields.io/badge/Prometheus-AlertManager-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)](https://prometheus.io)
 
-**KubeOps-Aegis (Azure Edition)** is an enterprise-grade **Autonomous SRE & GitOps AI Agent** engineered for production **Azure Kubernetes Service (AKS 1.30+)** environments.
+**KubeOps-Aegis (Azure Edition)** is a multi-disciplinary **Autonomous SRE AI Agent & 3-Tier Enterprise E-Commerce Platform** engineered for **Azure Kubernetes Service (AKS 1.30+)** with **Microsoft Entra ID (OIDC)** authentication, **Azure Managed PostgreSQL**, **Azure Blob Storage**, and **ArgoCD GitOps** self-healing.
 
 ---
 
-## 🏛️ Azure Architecture & Flow
+## 🏛️ End-to-End Architecture & Operational Flow
 
 ```mermaid
 flowchart TD
-    subgraph AKSCluster["1. Azure Kubernetes Service (AKS 1.30+)"]
-        Pods["Microservice Pods (payment-service)"] -->|OOM / CrashLoop / Throttling| Prom["Prometheus AlertManager"]
+    subgraph ClientLayer["1. Client & User Layer"]
+        ReactUI["React 18 SPA (apps/frontend)"] -->|OIDC Token| EntraID["Microsoft Entra ID (Azure AD)"]
+        ReactUI -->|HTTPS / REST API| Ingress["NGINX Ingress Controller"]
     end
 
-    subgraph Ingestion["2. Webhook & Ingestion Layer"]
-        Prom -->|HTTP POST Webhook| Ingest["FastAPI Alert Ingestor"]
-        UIChaos["Web Dashboard"] -->|API POST /chaos/trigger| Ingest
+    subgraph AKSCluster["2. Azure Kubernetes Service (AKS Cluster)"]
+        Ingress --> AppService["3-Tier Backend API (apps/backend)"]
+        AppService -->|Managed Private Endpoint| AzurePSQL["Azure Database for PostgreSQL (Standard_B1ms)"]
+        AppService -->|Async Blob Client| AzureBlob["Azure Blob Storage (4 Containers)"]
+        
+        AppService -->|Scrapes /metrics| Prom["Prometheus & AlertManager"]
+        Prom -->|Triggers Alert Webhook| Agent["KubeOps SRE AI Agent (agent/app)"]
     end
 
-    subgraph LangGraphEngine["3. LangGraph Multi-Agent State Machine"]
-        Ingest --> Triage["Triage Agent"]
-        Triage --> Diagnostic["Diagnostic Agent (AKS Logs & PromQL)"]
-        Diagnostic --> Remediation["Remediation Agent (Resource Bump)"]
-        Remediation --> GitOpsAgent["GitOps PR Agent (Unified Diff)"]
+    subgraph AIStateGraph["3. LangGraph Autonomous AI State Machine"]
+        Agent -->|Node 1| Triage["Triage Agent (K8s API Scan)"]
+        Triage -->|Node 2| Diagnostic["Diagnostic Agent (RCA via Azure OpenAI)"]
+        Diagnostic -->|Node 3| Remediate["Remediation Agent (Pod Restarts & Scaling)"]
+        Remediate -->|Node 4| Audit["Audit Agent (Uploads Incident Snapshot to Blob)"]
     end
 
-    subgraph HITL["4. Human-In-The-Loop Guardrail"]
-        GitOpsAgent --> HITLCheck{"Web Dashboard Sign-Off"}
-        HITLCheck -->|Approved| ApplyNode["Apply Patch to Git Repo"]
-    end
-
-    subgraph Reconciliation["5. Declarative Reconciliation"]
-        ApplyNode --> GitRepo["GitOps Repo / values.yaml"]
-        GitRepo -->|Auto Sync| ArgoCD["ArgoCD Controller"]
-        ArgoCD -->|Reconciles AKS State| Pods
+    subgraph GitOpsReconciliation["4. Declarative GitOps Reconciliation"]
+        Remediate -->|Pushes Patch Manifest| GitRepo["GitHub Repository (k8s/workloads)"]
+        GitRepo -->|Auto Sync| ArgoCD["ArgoCD GitOps Controller"]
+        ArgoCD -->|Reconciles AKS Workloads| AppService
     end
 ```
 
 ---
 
-## 🔒 Azure Security Protocols & Networking Highlights
+## 🗄️ Azure Storage Containers & Database Cost Optimization
 
-1. **Dedicated Subnet Isolation**: AKS system and user node pools run in isolated private subnets (`10.100.1.0/24` and `10.100.2.0/24`).
-2. **Azure NAT Gateway**: Outbound egress is routed through an **Azure Standard NAT Gateway** with static Public IP.
-3. **Network Security Group (NSG)**: Enforces strict inbound rules (`AllowHTTPSInbound`, `AllowVNetInbound`, `DenyAllInbound`).
-4. **Azure Workload Identity**: Uses federated OIDC credentials mapping Kubernetes ServiceAccount (`default:kubeops-agent-sa`) to Azure Managed Identity.
-5. **Azure Container Registry (ACR)**: Configured with `AcrPull` role binding to AKS Kubelet Managed Identity.
+### 📦 Azure Blob Storage Containers (Single Storage Account: `kubeopsaegisstprd`)
+Instead of managing multiple storage buckets, all object data is organized inside **4 dedicated Azure Storage Containers**:
 
----
+1. `tfstate`: Remote state backend for Terraform deployment locking.
+2. `incident-logs`: Stores SRE AI Agent incident audit JSON snapshots.
+3. `user-media`: Product catalog images and user profile avatars.
+4. `order-receipts`: Customer PDF order checkout receipts.
 
-## 📂 Repository Structure
+### 💰 Cost-Optimized Azure Managed PostgreSQL Database
+* **SKU**: `Standard_B1ms` (Burstable 1 vCPU, 2 GiB RAM, 32 GB Storage).
+* **Cost**: Only **~$15.00 – $25.00 / month** (~$0.50/day).
+* **Delegated Subnet**: Runs inside `snet-database` (`10.100.3.0/24`) with Zero Public Network Access.
 
-```
-KubeOps-Aegis/
-├── agent/                         # Python AI Agent (LangGraph + FastAPI + K8s API)
-│   ├── app/
-│   │   ├── agents/                # Triage, Diagnostic, Remediation, GitOps, PostMortem agents
-│   │   ├── api/                   # FastAPI routes & WebSocket manager
-│   │   ├── core/                  # Settings (Azure/AWS), state schemas, LLM factory
-│   │   ├── graph/                 # LangGraph State Machine compilation
-│   │   ├── tools/                 # AKS / EKS K8s tools, Prometheus PromQL, Git tools
-│   │   └── main.py                # Agent daemon entrypoint
-│   ├── tests/                     # Pytest suite
-│   └── requirements.txt
-├── web/                           # Real-Time Glassmorphism SRE Dashboard
-├── k8s/                           # PrometheusRules, AlertManager config, Chaos tools
-├── gitops/                        # GitOps Application Helm chart & ArgoCD CRDs
-├── terraform/                     # Production Azure AKS Infrastructure (RG, VNet, NAT, NSG, AKS, ACR)
-│   ├── main.tf                    # Resource Group, VNet, Subnets, NAT Gateway, NSG
-│   ├── aks.tf                     # AKS 1.30+ CNI Overlay cluster & Node Pools
-│   ├── identity.tf                # Azure Workload Identity & Federated Credentials
-│   ├── acr.tf                     # Azure Container Registry & AcrPull RBAC
-│   ├── argocd.tf                  # ArgoCD Helm deployment
-│   ├── prometheus.tf              # Prometheus Stack Helm deployment
-│   └── env/prd.tfvars             # Production Azure tfvars
-├── scripts/                       # Run & Demo Scripts
-│   ├── run_agent.ps1              # Agent daemon launcher
-│   └── simulate_incident.py       # Interactive CLI simulator
-└── README.md
-```
+### 🔮 Neo4j Graph Database Options
+* **Option A (Neo4j AuraDB Managed Cloud)**: Recommended! Uses Neo4j's official managed service on Azure with a **Free Tier ($0/month)**.
+* **Option B (Self-Hosted Azure VM)**: Provided in Terraform module `modules/neo4j` for specialized private VM deployments.
 
 ---
 
-## 🚀 Azure AKS Deployment Guide
+## 🔒 Azure Security & Isolation Rules
+
+1. **Subnet Security Groups (NSGs)**:
+   * `snet-aks-system` & `snet-aks-user`: Egress routed through **Azure Standard NAT Gateway**.
+   * `snet-database`: Accepts PostgreSQL traffic (5432) strictly from AKS subnets.
+   * `snet-private-endpoints`: Restricts Key Vault & Storage access to VNet.
+2. **Azure Workload Identity**: Passwordless authentication binding Kubernetes ServiceAccount `default:aegis-agent-sa` to Azure User-Assigned Managed Identity via OIDC federated credentials.
+3. **Microsoft Entra ID (OIDC)**: Validates incoming Bearer JWT tokens against Azure AD JWKS endpoint.
+
+---
+
+## 🛠️ API Endpoint Directory
+
+### 🔑 Authentication (`/api/v1/auth`)
+* `POST /api/v1/auth/register`: Register new customer profile.
+* `POST /api/v1/auth/login`: Authenticate and return Bearer JWT token.
+
+### 📦 Product Catalog (`/api/v1/products`)
+* `GET /api/v1/products`: List catalog products (supports `?category=` filter & `?search=`).
+* `GET /api/v1/products/{id}`: Detailed product metadata.
+
+### 🛒 Checkout & Orders (`/api/v1/orders`)
+* `POST /api/v1/orders`: Create new order & trigger PDF receipt upload.
+* `GET /api/v1/orders`: List order history.
+
+### 📄 Azure Blob Uploads (`/api/v1/uploads`)
+* `POST /api/v1/uploads/receipt`: Upload PDF payment receipt to `order-receipts` container.
+
+### 💥 SRE Chaos Simulations (`/api/v1/chaos`)
+* `GET /api/v1/chaos/db-query-timeout`: Simulates PostgreSQL 15s lock wait deadlock (`504 Gateway Timeout`).
+* `GET /api/v1/chaos/http-request-timeout`: Simulates payment gateway read timeout (`504 Gateway Timeout`).
+* `POST /api/v1/chaos/oom-leak`: Allocates 150MB buffer chunks to trigger `OOMKilled`.
+* `POST /api/v1/chaos/cpu-burn`: Heavy CPU prime calculations to trigger HPA scaling.
+
+---
+
+## 🚀 Step-by-Step Deployment Roadmap
 
 ```bash
 # 1. Log in to Azure CLI
 az login
 
-# 2. Deploy Azure Infrastructure via Terraform
+# 2. Deploy Azure Infrastructure (Phase 1: VNet & NAT, Phase 2: Data Layer, Phase 3: AKS)
 cd terraform
 terraform init
 terraform apply -var-file="env/prd.tfvars" -auto-approve
 
-# 3. Connect kubectl to AKS
+# 3. Connect kubectl to AKS Cluster
 $(terraform output -raw kubeconfig_command)
 
-# 4. Run the Agent Backend
-cd ../agent
-pip install -r requirements.txt
-python -m agent.app.main
+# 4. Deploy 3-Tier Application & SRE Agent
+kubectl apply -f ../k8s/3tier-app/
+kubectl apply -f ../k8s/agent/
+kubectl apply -f ../k8s/argocd/
 ```

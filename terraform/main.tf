@@ -108,7 +108,20 @@ module "keyvault" {
   tags                       = var.tags
 }
 
-# 6. Neo4j Graph Database Module
+# 6. PostgreSQL Flexible Server Module (Managed DB - ~$15-$25/mo)
+module "postgresql" {
+  count               = var.deploy_data_layer && var.deploy_networking ? 1 : 0
+  source              = "./modules/postgresql"
+  server_name         = "${var.prefix}-psql-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_data.name
+  subnet_id           = module.vnet[0].database_subnet_id
+  vnet_id             = module.vnet[0].vnet_id
+  admin_password      = var.db_password
+  tags                = var.tags
+}
+
+# 7. Neo4j Graph Database Module
 module "neo4j" {
   count               = var.deploy_data_layer && var.deploy_networking ? 1 : 0
   source              = "./modules/neo4j"

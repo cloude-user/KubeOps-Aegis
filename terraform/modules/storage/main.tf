@@ -28,6 +28,24 @@ resource "azurerm_storage_container" "container_rag" {
   container_access_type = "private"
 }
 
+resource "azurerm_storage_container" "container_media" {
+  name                  = "user-media"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "container_receipts" {
+  name                  = "order-receipts"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "container_incidents" {
+  name                  = "incident-logs"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
 # Private DNS Zone for Blob Storage
 resource "azurerm_private_dns_zone" "dns_blob" {
   name                = "privatelink.blob.core.windows.net"
