@@ -17,7 +17,7 @@ environment         = "prd"
 kubernetes_version  = "1.30.0"
 
 # Database Configuration
-db_sku_name = "GP_Standard_D2s_v3"
+db_sku_name = "B_Standard_B1ms"
 db_version  = "16"
 
 # Networking Configuration
