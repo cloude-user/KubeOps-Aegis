@@ -21,6 +21,13 @@ resource "azurerm_postgresql_flexible_server" "psql" {
 
   tags = var.tags
 
+  lifecycle {
+    ignore_changes = [
+      zone,
+      high_availability
+    ]
+  }
+
   depends_on = [
     azurerm_private_dns_zone_virtual_network_link.dns_vnet_link
   ]
