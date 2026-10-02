@@ -13,7 +13,7 @@ resource "azurerm_postgresql_flexible_server" "psql" {
   administrator_login    = var.admin_username
   administrator_password = var.admin_password
 
-  sku_name   = "B_Standard_B1ms" # Burstable 1 vCPU, 2GB RAM (~$15-$25/month)
+  sku_name   = var.sku_name
   storage_mb = 32768             # 32 GB Storage
 
   backup_retention_days = 7

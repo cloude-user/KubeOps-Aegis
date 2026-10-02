@@ -35,6 +35,12 @@ variable "admin_password" {
   sensitive   = true
 }
 
+variable "sku_name" {
+  type        = string
+  description = "SKU Name for PostgreSQL Flexible Server"
+  default     = "GP_Standard_D2s_v3"
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags map"
