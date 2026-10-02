@@ -38,7 +38,7 @@ variable "admin_password" {
 variable "sku_name" {
   type        = string
   description = "SKU Name for PostgreSQL Flexible Server"
-  default     = "B_Standard_B1ms"
+  default     = "GP_Standard_D2s_v3"
 }
 
 variable "tags" {
