@@ -15,7 +15,7 @@ resource "azurerm_postgresql_flexible_server" "psql" {
   zone                   = "1"
 
   sku_name   = "B_Standard_B1ms" # Burstable 1 vCPU, 2GB RAM (~$15-$25/month)
-  storage_mb = 32768            # 32 GB Storage
+  storage_mb = 32768             # 32 GB Storage
 
   backup_retention_days = 7
 

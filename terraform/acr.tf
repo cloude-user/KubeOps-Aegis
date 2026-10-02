@@ -16,8 +16,9 @@ resource "azurerm_container_registry" "acr" {
 }
 
 # 2. RBAC Role Assignment: Grant AKS Kubelet Permission to Pull Images from ACR (AcrPull)
+# Executed ONLY when AKS cluster is deployed (Phase 3)
 resource "azurerm_role_assignment" "aks_acr_pull" {
-  count                = var.deploy_aks && (var.deploy_data_layer || var.deploy_aks) ? 1 : 0
+  count                = var.deploy_aks && length(azurerm_kubernetes_cluster.aks) > 0 && length(azurerm_container_registry.acr) > 0 ? 1 : 0
   principal_id         = azurerm_kubernetes_cluster.aks[0].kubelet_identity[0].object_id
   role_definition_name = "AcrPull"
   scope                = azurerm_container_registry.acr[0].id

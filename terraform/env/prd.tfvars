@@ -4,7 +4,7 @@
 
 # Feature Toggles (Phase 1: Deploy Networking Only Today)
 deploy_networking        = true
-deploy_data_layer        = false
+deploy_data_layer        = true
 deploy_aks               = false
 deploy_gitops_monitoring = false
 
