@@ -8,7 +8,7 @@ deploy_data_layer        = true
 deploy_neo4j             = false
 deploy_aks               = true
 deploy_user_node_pool    = false
-deploy_gitops_monitoring = false
+deploy_gitops_monitoring = true
 
 # General Azure Configuration
 location            = "eastasia"
