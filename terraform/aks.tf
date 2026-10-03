@@ -37,7 +37,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   local_account_disabled            = false
 
   dynamic "azure_active_directory_role_based_access_control" {
-    for_each = length(var.admin_group_ids) > 0 && var.admin_group_ids[0] != "00000000-0000-0000-0000-000000000000" ? [1] : []
+    for_each = try(var.admin_group_ids[0], "") != "" && try(var.admin_group_ids[0], "") != "00000000-0000-0000-0000-000000000000" ? [1] : []
     content {
       managed                = true
       azure_rbac_enabled     = true
@@ -46,7 +46,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     }
   }
 
-  api_server_authorized_ip_ranges = length(var.api_server_authorized_ip_ranges) > 0 && var.api_server_authorized_ip_ranges[0] != "198.51.100.0/24" ? var.api_server_authorized_ip_ranges : null
+  api_server_authorized_ip_ranges = length(var.api_server_authorized_ip_ranges) > 0 && try(var.api_server_authorized_ip_ranges[0], "") != "198.51.100.0/24" ? var.api_server_authorized_ip_ranges : null
 
   identity {
     type         = "UserAssigned"
