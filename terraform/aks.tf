@@ -61,7 +61,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     vnet_subnet_id               = module.vnet[0].aks_system_subnet_id
     enable_auto_scaling          = false
     orchestrator_version         = var.kubernetes_version
-    only_critical_addons_enabled = var.deploy_user_node_pool
+    only_critical_addons_enabled = true
 
     node_labels = {
       "role" = "system"
