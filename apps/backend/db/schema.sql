@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- 2. Product Categories Table
 CREATE TABLE IF NOT EXISTS categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),nsg
     name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

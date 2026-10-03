@@ -13,6 +13,14 @@ resource "azurerm_user_assigned_identity" "aks_identity" {
   tags = var.tags
 }
 
+# Role Assignment: Grant AKS Identity Network Contributor on VNet (Required for Bring-Your-Own-VNet)
+resource "azurerm_role_assignment" "aks_network_contributor" {
+  count                = var.deploy_aks && var.deploy_networking ? 1 : 0
+  scope                = module.vnet[0].vnet_id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_user_assigned_identity.aks_identity[0].principal_id
+}
+
 # 2. Azure Kubernetes Service (AKS) Cluster
 resource "azurerm_kubernetes_cluster" "aks" {
   count               = var.deploy_aks ? 1 : 0
@@ -28,14 +36,17 @@ resource "azurerm_kubernetes_cluster" "aks" {
   workload_identity_enabled         = true
   local_account_disabled            = false
 
-  azure_active_directory_role_based_access_control {
-    managed                = true
-    azure_rbac_enabled     = true
-    tenant_id              = var.tenant_id
-    admin_group_object_ids = var.admin_group_ids
+  dynamic "azure_active_directory_role_based_access_control" {
+    for_each = length(var.admin_group_ids) > 0 && var.admin_group_ids[0] != "00000000-0000-0000-0000-000000000000" ? [1] : []
+    content {
+      managed                = true
+      azure_rbac_enabled     = true
+      tenant_id              = var.tenant_id != "00000000-0000-0000-0000-000000000000" ? var.tenant_id : null
+      admin_group_object_ids = var.admin_group_ids
+    }
   }
 
-  api_server_authorized_ip_ranges = var.api_server_authorized_ip_ranges
+  api_server_authorized_ip_ranges = length(var.api_server_authorized_ip_ranges) > 0 && var.api_server_authorized_ip_ranges[0] != "198.51.100.0/24" ? var.api_server_authorized_ip_ranges : null
 
   identity {
     type         = "UserAssigned"
@@ -74,7 +85,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
   tags = var.tags
 
   depends_on = [
-    module.nat_gateway
+    module.nat_gateway,
+    azurerm_role_assignment.aks_network_contributor
   ]
 }
 
