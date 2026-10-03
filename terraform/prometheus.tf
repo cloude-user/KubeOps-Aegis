@@ -21,5 +21,35 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "ClusterIP"
   }
 
+  set {
+    name  = "prometheus.prometheusSpec.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.tolerations[0].operator"
+    value = "Exists"
+  }
+
+  set {
+    name  = "alertmanager.alertmanagerSpec.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "alertmanager.alertmanagerSpec.tolerations[0].operator"
+    value = "Exists"
+  }
+
+  set {
+    name  = "grafana.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "grafana.tolerations[0].operator"
+    value = "Exists"
+  }
+
   depends_on = [azurerm_kubernetes_cluster.aks]
 }

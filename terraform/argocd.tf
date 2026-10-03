@@ -26,5 +26,15 @@ resource "helm_release" "argocd" {
     value = "true"
   }
 
+  set {
+    name  = "global.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "global.tolerations[0].operator"
+    value = "Exists"
+  }
+
   depends_on = [azurerm_kubernetes_cluster.aks]
 }
