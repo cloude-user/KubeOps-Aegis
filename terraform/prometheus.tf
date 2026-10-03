@@ -34,6 +34,11 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "false"
   }
 
+  set {
+    name  = "prometheusOperator.tls.enabled"
+    value = "false"
+  }
+
   # Tolerations for Prometheus Operator
   set {
     name  = "prometheusOperator.tolerations[0].key"
