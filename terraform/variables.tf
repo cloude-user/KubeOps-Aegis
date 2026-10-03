@@ -155,3 +155,9 @@ variable "deploy_gitops_monitoring" {
   description = "Enable deployment of ArgoCD & Prometheus Helm stacks inside AKS"
   default     = true
 }
+
+variable "deploy_user_node_pool" {
+  type        = bool
+  description = "Enable deployment of separate User Workload Node Pool"
+  default     = false
+}

@@ -61,7 +61,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     vnet_subnet_id               = module.vnet[0].aks_system_subnet_id
     enable_auto_scaling          = false
     orchestrator_version         = var.kubernetes_version
-    only_critical_addons_enabled = true
+    only_critical_addons_enabled = var.deploy_user_node_pool
 
     node_labels = {
       "role" = "system"
@@ -92,7 +92,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
 # 3. User Workload Node Pool (Auto-scaling Spot / On-Demand)
 resource "azurerm_kubernetes_cluster_node_pool" "user_workloads" {
-  count                 = var.deploy_aks ? 1 : 0
+  count                 = (var.deploy_aks && var.deploy_user_node_pool) ? 1 : 0
   name                  = "userpool"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks[0].id
   vm_size               = var.user_node_vm_size
