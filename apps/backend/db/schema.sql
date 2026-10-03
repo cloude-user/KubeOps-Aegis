@@ -84,18 +84,18 @@ ON CONFLICT (name) DO NOTHING;
 
 -- Seed Products Catalog
 INSERT INTO products (id, category_id, title, description, price, stock_quantity, image_blob_url) VALUES
-    ('p1111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'Azure AKS Masterclass Handbook', 'Complete guide to building resilient Kubernetes on Azure', 49.99, 150, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/aks-guide.png'),
-    ('p2222222-2222-2222-2222-222222222222', 'c1111111-1111-1111-1111-111111111111', 'Terraform Enterprise IaC Guide', 'Production-grade Terraform modules & state management', 59.99, 200, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/terraform-guide.png'),
-    ('p3333333-3333-3333-3333-333333333333', 'c1111111-1111-1111-1111-111111111111', 'Autonomous SRE AI Agent Toolkit', 'LangGraph & Prometheus self-healing agent framework', 89.99, 75, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/sre-agent.png'),
-    ('p4444444-4444-4444-4444-444444444444', 'c3333333-3333-3333-3333-333333333333', 'Mechanical Kubernetes Keycaps', 'Custom CNC aluminum Keycaps with K8s logos', 29.99, 500, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/keycaps.png')
+    ('b1111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'Azure AKS Masterclass Handbook', 'Complete guide to building resilient Kubernetes on Azure', 49.99, 150, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/aks-guide.png'),
+    ('b2222222-2222-2222-2222-222222222222', 'c1111111-1111-1111-1111-111111111111', 'Terraform Enterprise IaC Guide', 'Production-grade Terraform modules & state management', 59.99, 200, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/terraform-guide.png'),
+    ('b3333333-3333-3333-3333-333333333333', 'c1111111-1111-1111-1111-111111111111', 'Autonomous SRE AI Agent Toolkit', 'LangGraph & Prometheus self-healing agent framework', 89.99, 75, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/sre-agent.png'),
+    ('b4444444-4444-4444-4444-444444444444', 'c3333333-3333-3333-3333-333333333333', 'Mechanical Kubernetes Keycaps', 'Custom CNC aluminum Keycaps with K8s logos', 29.99, 500, 'https://kubeopsaegisstprd.blob.core.windows.net/user-media/products/keycaps.png')
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed Sample Orders
 INSERT INTO orders (id, user_id, total_amount, status, receipt_blob_url, shipping_address) VALUES
-    ('o1111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 109.98, 'PAID', 'https://kubeopsaegisstprd.blob.core.windows.net/order-receipts/receipt_o1111111.pdf', '100 Azure Way, Seattle, WA')
+    ('d1111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 109.98, 'PAID', 'https://kubeopsaegisstprd.blob.core.windows.net/order-receipts/receipt_o1111111.pdf', '100 Azure Way, Seattle, WA')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES
-    ('o1111111-1111-1111-1111-111111111111', 'p1111111-1111-1111-1111-111111111111', 1, 49.99),
-    ('o1111111-1111-1111-1111-111111111111', 'p2222222-2222-2222-2222-222222222222', 1, 59.99)
+    ('d1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', 1, 49.99),
+    ('d1111111-1111-1111-1111-111111111111', 'b2222222-2222-2222-2222-222222222222', 1, 59.99)
 ON CONFLICT (id) DO NOTHING;
