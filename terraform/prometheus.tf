@@ -11,6 +11,8 @@ resource "helm_release" "kube_prometheus_stack" {
   namespace        = "monitoring"
   create_namespace = true
 
+  timeout = 900 # 15 minutes timeout
+
   set {
     name  = "alertmanager.alertmanagerSpec.routePrefix"
     value = "/"
@@ -21,6 +23,29 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "ClusterIP"
   }
 
+  # Disable admission webhook job that got stuck on pre-install
+  set {
+    name  = "prometheusOperator.admissionWebhooks.enabled"
+    value = "false"
+  }
+
+  set {
+    name  = "prometheusOperator.admissionWebhooks.patch.enabled"
+    value = "false"
+  }
+
+  # Tolerations for Prometheus Operator
+  set {
+    name  = "prometheusOperator.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "prometheusOperator.tolerations[0].operator"
+    value = "Exists"
+  }
+
+  # Tolerations for Prometheus Server
   set {
     name  = "prometheus.prometheusSpec.tolerations[0].key"
     value = "CriticalAddonsOnly"
@@ -31,6 +56,7 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "Exists"
   }
 
+  # Tolerations for Alertmanager
   set {
     name  = "alertmanager.alertmanagerSpec.tolerations[0].key"
     value = "CriticalAddonsOnly"
@@ -41,6 +67,7 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "Exists"
   }
 
+  # Tolerations for Grafana
   set {
     name  = "grafana.tolerations[0].key"
     value = "CriticalAddonsOnly"
@@ -48,6 +75,28 @@ resource "helm_release" "kube_prometheus_stack" {
 
   set {
     name  = "grafana.tolerations[0].operator"
+    value = "Exists"
+  }
+
+  # Tolerations for Kube-State-Metrics
+  set {
+    name  = "kube-state-metrics.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "kube-state-metrics.tolerations[0].operator"
+    value = "Exists"
+  }
+
+  # Tolerations for Node Exporter
+  set {
+    name  = "prometheus-node-exporter.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "prometheus-node-exporter.tolerations[0].operator"
     value = "Exists"
   }
 
