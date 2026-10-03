@@ -20,7 +20,7 @@ resource "helm_release" "kube_prometheus_stack" {
 
   set {
     name  = "grafana.service.type"
-    value = "ClusterIP"
+    value = "LoadBalancer"
   }
 
   # Disable admission webhook job that got stuck on pre-install
