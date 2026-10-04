@@ -1,0 +1,83 @@
+# Default values for aegis-agent Helm chart.
+
+replicaCount: 1
+
+image:
+  repository: kubeopsaegisacrprd.azurecr.io/kubeops-aegis-agent
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "kubeops-aegis-agent"
+
+serviceAccount:
+  create: true
+  name: "kubeops-aegis-agent-sa"
+  annotations:
+    # Azure Workload Identity Client ID (Bedrock IAM equivalent for Azure)
+    # azure.workload.identity/client-id: "00000000-0000-0000-0000-000000000000"
+  labels:
+    azure.workload.identity/use: "true"
+
+rbac:
+  create: true
+  # ClusterRole granting inspection and remediation permissions
+  clusterRole: true
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+securityContext:
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Tolerations required for single-node AKS cluster with CriticalAddonsOnly taint
+tolerations:
+  - key: "CriticalAddonsOnly"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+nodeSelector: {}
+
+affinity: {}
+
+# Agent Runtime Configuration & Cloud Integrations
+config:
+  environment: "prd"
+  kubernetesInCluster: "true"
+  prometheusUrl: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
+  azureOpenaiEndpoint: "https://kubeops-aegis-openai.openai.azure.com/"
+  azureOpenaiDeploymentName: "gpt-4o"
+  azureOpenaiApiVersion: "2024-06-01"
+  azureKeyvaultUrl: "https://kubeops-aegis-kv-prd.vault.azure.net/"
+  azureStorageAccountName: "kubeopsaegisstprd"
+  azureStorageContainer: "incident-logs"
+
+# Optional secrets (leave empty if using passwordless Azure Workload Identity / RBAC)
+secrets:
+  azureOpenaiApiKey: ""
+  openaiApiKey: ""
+  geminiApiKey: ""
+  secretKey: "aegis-super-secret-jwt-key-2026-production"

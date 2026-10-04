@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aegis-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aegis-agent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aegis-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "aegis-agent.selectorLabels" . | nindent 8 }}
+        {{- with .Values.serviceAccount.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "aegis-agent.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.config.environment | quote }}
+            - name: KUBERNETES_IN_CLUSTER
+              value: {{ .Values.config.kubernetesInCluster | quote }}
+            - name: PROMETHEUS_URL
+              value: {{ .Values.config.prometheusUrl | quote }}
+            - name: AZURE_OPENAI_ENDPOINT
+              value: {{ .Values.config.azureOpenaiEndpoint | quote }}
+            - name: AZURE_OPENAI_DEPLOYMENT_NAME
+              value: {{ .Values.config.azureOpenaiDeploymentName | quote }}
+            - name: AZURE_OPENAI_API_VERSION
+              value: {{ .Values.config.azureOpenaiApiVersion | quote }}
+            - name: AZURE_KEYVAULT_URL
+              value: {{ .Values.config.azureKeyvaultUrl | quote }}
+            - name: AZURE_STORAGE_ACCOUNT_NAME
+              value: {{ .Values.config.azureStorageAccountName | quote }}
+            - name: AZURE_STORAGE_CONTAINER
+              value: {{ .Values.config.azureStorageContainer | quote }}
+            - name: SECRET_KEY
+              value: {{ .Values.secrets.secretKey | quote }}
+            {{- if .Values.secrets.azureOpenaiApiKey }}
+            - name: AZURE_OPENAI_API_KEY
+              value: {{ .Values.secrets.azureOpenaiApiKey | quote }}
+            {{- end }}
+            {{- if .Values.secrets.openaiApiKey }}
+            - name: OPENAI_API_KEY
+              value: {{ .Values.secrets.openaiApiKey | quote }}
+            {{- end }}
+            {{- if .Values.secrets.geminiApiKey }}
+            - name: GEMINI_API_KEY
+              value: {{ .Values.secrets.geminiApiKey | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

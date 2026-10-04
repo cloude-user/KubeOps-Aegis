@@ -9,6 +9,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from agent.app.services.k8s_client import k8s_service
 from agent.app.services.blob_storage import blob_service
 from agent.app.services.database import db_service, IncidentRecord
+from agent.app.services.prometheus_client import prometheus_service
 from agent.app.core.config import settings
 
 logger = logging.getLogger("aegis.engine")
@@ -22,6 +23,7 @@ class SREAgentState(TypedDict):
     auto_apply: bool
     failing_pod: Optional[Dict[str, Any]]
     logs: Optional[str]
+    metrics: Optional[Dict[str, Any]]
     rca_result: Optional[Dict[str, Any]]
     incident_id: Optional[str]
     remediation_executed: bool
@@ -40,15 +42,44 @@ class AutonomousSREAgent:
     def _get_llm_model(self):
         """Factory method to instantiate Azure OpenAI, OpenAI, or Google Gemini LLM models."""
         try:
-            # Option 1: Azure OpenAI Service (Enterprise Default)
-            if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
+            # Option 1A: Azure OpenAI via Passwordless Workload Identity / Azure RBAC (AWS Bedrock Style)
+            if settings.AZURE_OPENAI_ENDPOINT and not settings.AZURE_OPENAI_API_KEY:
+                try:
+                    from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+                    from langchain_openai import AzureChatOpenAI
+                    token_provider = get_bearer_token_provider(
+                        DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+                    )
+                    logger.info("Initializing Azure OpenAI via Workload Identity / RBAC Token Provider (%s)", settings.AZURE_OPENAI_DEPLOYMENT_NAME)
+                    return AzureChatOpenAI(
+                        azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                        azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+                        api_version=settings.AZURE_OPENAI_API_VERSION,
+                        azure_ad_token_provider=token_provider,
+                        temperature=0.1
+                    )
+                except Exception as ex:
+                    logger.info("Workload Identity fallback: %s", ex)
+
+            # Option 1B: Azure OpenAI Service with API Key (Env or Azure Key Vault)
+            azure_api_key = settings.AZURE_OPENAI_API_KEY
+            if not azure_api_key and settings.AZURE_KEYVAULT_URL:
+                try:
+                    from agent.app.services.keyvault import keyvault_service
+                    azure_api_key = keyvault_service._get_secret_sync("azure-openai-api-key", fallback_value=None)
+                    if azure_api_key:
+                        logger.info("Securely retrieved Azure OpenAI API key from Azure Key Vault (zero keys in YAML/Git).")
+                except Exception as kv_err:
+                    logger.debug("Key Vault secret lookup skipped: %s", kv_err)
+
+            if azure_api_key and settings.AZURE_OPENAI_ENDPOINT:
                 from langchain_openai import AzureChatOpenAI
                 logger.info("Initializing Azure OpenAI LLM Model (%s)", settings.AZURE_OPENAI_DEPLOYMENT_NAME)
                 return AzureChatOpenAI(
                     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
                     azure_deployment=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
                     api_version=settings.AZURE_OPENAI_API_VERSION,
-                    api_key=settings.AZURE_OPENAI_API_KEY,
+                    api_key=azure_api_key,
                     temperature=0.1
                 )
             # Option 2: OpenAI API (gpt-4o)
@@ -60,13 +91,23 @@ class AutonomousSREAgent:
                     api_key=settings.OPENAI_API_KEY,
                     temperature=0.1
                 )
-            # Option 3: Google Gemini API (gemini-1.5-flash)
-            elif settings.GEMINI_API_KEY:
+            # Option 3: Google Gemini API (gemini-1.5-flash / gemini-1.5-pro)
+            gemini_key = settings.GEMINI_API_KEY
+            if not gemini_key and settings.AZURE_KEYVAULT_URL:
+                try:
+                    from agent.app.services.keyvault import keyvault_service
+                    gemini_key = keyvault_service._get_secret_sync("gemini-api-key", fallback_value=None)
+                    if gemini_key:
+                        logger.info("Securely retrieved Google Gemini API key from Azure Key Vault.")
+                except Exception as kv_err:
+                    logger.debug("Key Vault Gemini secret lookup skipped: %s", kv_err)
+
+            if gemini_key:
                 from langchain_google_genai import ChatGoogleGenerativeAI
-                logger.info("Initializing Google Gemini LLM Model")
+                logger.info("Initializing Google Gemini LLM Model (gemini-1.5-flash)")
                 return ChatGoogleGenerativeAI(
                     model="gemini-1.5-flash",
-                    google_api_key=settings.GEMINI_API_KEY,
+                    google_api_key=gemini_key,
                     temperature=0.1
                 )
             else:
@@ -132,20 +173,28 @@ class AutonomousSREAgent:
         return "end"
 
     async def _diagnose_node(self, state: SREAgentState) -> Dict[str, Any]:
-        """Node 2: Diagnostic Node - Fetch pod logs & execute LangChain Root Cause Analysis."""
+        """Node 2: Diagnostic Node - Fetch pod logs, Prometheus metrics & execute Root Cause Analysis."""
         pod = state["failing_pod"]
         namespace = state["namespace"]
         pod_name = pod["name"]
-        logger.info("[LangGraph Node: Diagnose] Fetching logs for pod '%s'...", pod_name)
+        logger.info("[LangGraph Node: Diagnose] Fetching telemetry & multi-layer logs for pod '%s'...", pod_name)
 
-        logs = await k8s_service.get_pod_logs(pod_name=pod_name, namespace=namespace, tail_lines=50)
-        rca_result = self._ai_root_cause_analysis(pod, logs)
+        # 1. Fetch Comprehensive Logs (Current + Previous Crash + K8s Warning Events)
+        logs = await k8s_service.get_pod_logs(pod_name=pod_name, namespace=namespace, tail_lines=100)
+
+        # 2. Fetch Prometheus RED Metrics (Memory working set, CPU throttle, 5xx rate)
+        metrics = await prometheus_service.get_pod_telemetry(pod_name=pod_name, namespace=namespace)
+        logger.info("[LangGraph Node: Diagnose] Scraped Prometheus telemetry for %s: Mem=%sMiB, CPU=%s, 5xx=%s",
+                    pod_name, metrics.get("memory_working_set_mib"), metrics.get("cpu_cores_used"), metrics.get("error_rate_5xx"))
+
+        # 3. Execute Root Cause Analysis (Azure OpenAI or Deterministic Rule Engine)
+        rca_result = self._ai_root_cause_analysis(pod, logs, metrics)
 
         # Save preliminary incident record in DB
         new_incident = IncidentRecord(
             id=state["incident_id"],
             title=f"Anomaly in {pod_name}",
-            severity="CRITICAL" if "OOM" in rca_result["reason"] or "CrashLoop" in pod.get("status", "") else "HIGH",
+            severity="CRITICAL" if "OOM" in rca_result["reason"] or pod.get("exit_code") == 137 else "HIGH",
             status="DIAGNOSED",
             failing_resource=f"pod/{pod_name}",
             namespace=namespace,
@@ -154,7 +203,7 @@ class AutonomousSREAgent:
         )
         db_service.add_incident(new_incident)
 
-        return {"logs": logs, "rca_result": rca_result, "status": "DIAGNOSED"}
+        return {"logs": logs, "metrics": metrics, "rca_result": rca_result, "status": "DIAGNOSED"}
 
     async def _remediate_node(self, state: SREAgentState) -> Dict[str, Any]:
         """Node 3: Remediation Node - Trigger self-healing action on Kubernetes."""
@@ -184,6 +233,7 @@ class AutonomousSREAgent:
         audit_payload = {
             "incident_id": incident_id,
             "target_pod": state["failing_pod"],
+            "metrics_at_crash": state.get("metrics"),
             "logs_tail": state["logs"],
             "rca": state["rca_result"],
             "remediation_executed": state["remediation_executed"],
@@ -203,45 +253,47 @@ class AutonomousSREAgent:
     # ------------------------------------------------------------------
     # AI Reasoning Helper (Azure OpenAI / LangChain / Rule Fallback)
     # ------------------------------------------------------------------
-    def _ai_root_cause_analysis(self, pod: Dict[str, Any], logs: str) -> Dict[str, Any]:
+    def _ai_root_cause_analysis(self, pod: Dict[str, Any], logs: str, metrics: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Analyze root cause using Azure OpenAI / LangChain LLM or Rule Engine fallback."""
         reason = pod.get("reason", pod.get("status", "Unknown"))
+        exit_code = pod.get("exit_code")
+        metrics_info = f"Memory: {metrics.get('memory_working_set_mib', 'N/A')}MiB, CPU: {metrics.get('cpu_cores_used', 'N/A')} cores, 5xx Rate: {metrics.get('error_rate_5xx', 'N/A')}/s" if metrics else "Metrics unavailable"
 
         # If LLM model is configured, execute LangChain reasoning
         if self.llm:
             try:
                 system_msg = SystemMessage(
                     content="You are an expert Autonomous SRE AI Agent for Azure Kubernetes Service (AKS). "
-                            "Analyze the provided pod status and log snippet. Return a concise root cause summary and remediation plan."
+                            "Analyze the provided pod status, Prometheus metrics, and multi-layer crash logs. Return a concise root cause summary and remediation plan."
                 )
-                user_msg = HumanMessage(content=f"Pod: {pod}\nLogs:\n{logs}")
+                user_msg = HumanMessage(content=f"Pod: {pod}\nMetrics: {metrics_info}\nLogs:\n{logs}")
                 response = self.llm.invoke([system_msg, user_msg])
                 return {
                     "reason": reason,
-                    "summary": f"Azure OpenAI RCA: {response.content[:200]}",
-                    "remediation_plan": "Execute pod restart and update memory limit via ArgoCD GitOps."
+                    "summary": f"Azure OpenAI RCA: {response.content[:250]}",
+                    "remediation_plan": "Execute pod restart and update resource limits via ArgoCD GitOps."
                 }
             except Exception as e:
                 logger.warning("LLM invocation error: %s. Falling back to SRE rule engine.", e)
 
-        # Intelligent Fallback Rules Engine
-        if "OOM" in logs or "OutOfMemory" in logs or "OOMKilled" in reason:
+        # Intelligent Fallback Rules Engine (Correlating Exit Codes, Telemetry & Logs)
+        if exit_code == 137 or "OOM" in logs or "OutOfMemory" in logs or "OOMKilled" in reason:
             return {
                 "reason": "OOMKilled",
-                "summary": "LangGraph RCA: Pod exceeded memory limit (OOMKilled exit code 137).",
-                "remediation_plan": "Execute pod restart and propose GitOps memory bump (+512Mi) via ArgoCD."
+                "summary": f"LangGraph RCA: Pod terminated by Linux OOM killer (Exit Code 137). Telemetry shows memory saturation ({metrics.get('memory_working_set_mib', 512)}MiB).",
+                "remediation_plan": "Restart pod and automatically bump cgroup memory limit (+512Mi) in GitOps repository."
             }
-        elif "CrashLoopBackOff" in reason or "Fatal" in logs:
+        elif exit_code in [1, 255] or "CrashLoopBackOff" in reason or "Fatal" in logs or "panic" in logs.lower():
             return {
                 "reason": "CrashLoopBackOff",
-                "summary": "LangGraph RCA: Application process exiting repeatedly on startup.",
-                "remediation_plan": "Flush pod cache, force pod deletion, and notify SRE via Webhook."
+                "summary": f"LangGraph RCA: Application crashed with fatal runtime error (Exit Code {exit_code or 1}). Container restart backoff triggered.",
+                "remediation_plan": "Purge corrupt transient state, restart pod, and alert on-call engineer with stack trace."
             }
         else:
             return {
-                "reason": "UnhealthyState",
-                "summary": f"LangGraph RCA: Pod in unhealthy phase ({reason}).",
-                "remediation_plan": "Perform soft restart of pod and monitor telemetry metrics."
+                "reason": reason or "UnhealthyState",
+                "summary": f"LangGraph RCA: Pod detected in unhealthy condition ({reason}). Telemetry: {metrics_info}.",
+                "remediation_plan": "Execute rolling restart and monitor RED metrics recovery in Prometheus."
             }
 
     # ------------------------------------------------------------------

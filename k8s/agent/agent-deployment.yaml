@@ -68,8 +68,8 @@ spec:
       serviceAccountName: aegis-agent-sa
       containers:
         - name: aegis-agent
-          image: kubeopsaegisacrprd.azurecr.io/kubeops-aegis-agent:v2.0.0
-          imagePullPolicy: Always
+          image: kubeopsaegisacrprd.azurecr.io/kubeops-aegis-agent:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
               name: http
@@ -85,14 +85,14 @@ spec:
             - name: AZURE_STORAGE_CONTAINER
               value: "incident-logs"
             - name: PROMETHEUS_URL
-              value: "http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090"
+              value: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
           resources:
             requests:
-              cpu: "250m"
+              cpu: "100m"
               memory: "256Mi"
             limits:
-              cpu: "1000m"
-              memory: "1024Mi"
+              cpu: "500m"
+              memory: "512Mi"
           livenessProbe:
             httpGet:
               path: /api/v1/health
@@ -105,6 +105,10 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+          effect: "NoSchedule"
 ---
 apiVersion: v1
 kind: Service

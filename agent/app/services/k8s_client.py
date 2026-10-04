@@ -64,7 +64,8 @@ class KubernetesService:
                     "status": "CrashLoopBackOff",
                     "restarts": 14,
                     "container": "payment-service",
-                    "reason": "OOMKilled: Memory limit 512Mi exceeded"
+                    "exit_code": 137,
+                    "reason": "OOMKilled: Container exceeded memory limit 512Mi"
                 }
             ]
         try:
@@ -73,12 +74,35 @@ class KubernetesService:
             for p in pods.items:
                 phase = p.status.phase
                 restarts = sum(cs.restart_count for cs in (p.status.container_statuses or []))
-                if phase != "Running" or restarts > 5:
+                
+                # Check container termination state (OOMKilled, Error, CrashLoop)
+                exit_code = None
+                term_reason = None
+                container_name = None
+                is_crashed = False
+
+                for cs in (p.status.container_statuses or []):
+                    container_name = cs.name
+                    if cs.last_state and cs.last_state.terminated:
+                        exit_code = cs.last_state.terminated.exit_code
+                        term_reason = cs.last_state.terminated.reason
+                        if exit_code in [137, 139, 1, 255] or term_reason in ["OOMKilled", "Error"]:
+                            is_crashed = True
+                    if cs.state and cs.state.waiting:
+                        waiting_reason = cs.state.waiting.reason
+                        if waiting_reason in ["CrashLoopBackOff", "ImagePullBackOff", "CreateContainerConfigError"]:
+                            is_crashed = True
+                            term_reason = waiting_reason
+
+                if phase != "Running" or restarts > 0 or is_crashed:
                     failing.append({
                         "name": p.metadata.name,
                         "namespace": namespace,
-                        "status": phase,
+                        "status": term_reason or phase,
                         "restarts": restarts,
+                        "container": container_name,
+                        "exit_code": exit_code,
+                        "reason": f"{term_reason or phase} (Exit Code: {exit_code}, Restarts: {restarts})",
                         "node": p.spec.node_name
                     })
             return failing
@@ -86,20 +110,58 @@ class KubernetesService:
             logger.error("Error checking failing pods in namespace '%s': %s", namespace, e)
             return []
 
-    def _get_pod_logs_sync(self, pod_name: str, namespace: str, tail_lines: int) -> str:
+    def _get_pod_logs_sync(self, pod_name: str, namespace: str, tail_lines: int = 100) -> str:
+        """Fetch complete multi-layer diagnostic logs: Current logs + Previous container crash logs + K8s Events."""
         self.initialize()
         if not self._core_v1:
             return (
-                f"[LOG DUMP - {pod_name}]\n"
-                "2026-10-01T21:40:01Z [INFO] Initializing Payment Service v2.4...\n"
-                "2026-10-01T21:40:05Z [ERROR] java.lang.OutOfMemoryError: Java heap space\n"
-                "2026-10-01T21:40:06Z [FATAL] Terminating process due to unhandled OOMKilled signal.\n"
+                f"[COMPREHENSIVE TELEMETRY & LOG DUMP - {pod_name}]\n"
+                "--- [1. PREVIOUS CRASH LOG (Exit Code 137)] ---\n"
+                "2026-10-04T10:14:02Z [INFO] Processing batch checkout order payload...\n"
+                "2026-10-04T10:14:05Z [ERROR] Memory consumption reached 99.8% of 512Mi cgroup limit.\n"
+                "2026-10-04T10:14:06Z [FATAL] Linux Kernel OOM killer invoked. Process killed with signal SIGKILL (exit code 137).\n"
+                "--- [2. CURRENT CONTAINER RESTART LOG] ---\n"
+                "2026-10-04T10:14:10Z [INFO] Starting service up after restart (attempt 1)...\n"
+                "--- [3. KUBERNETES POD WARNING EVENTS] ---\n"
+                "Warning  OOMKilling  pod/payment-api  Memory cgroup out of memory: Killed process 412 (python)\n"
+                "Warning  BackOff     pod/payment-api  Back-off restarting failed container\n"
             )
+
+        log_sections = []
+
+        # 1. Fetch Previous Terminated Container Log (if container crashed and restarted)
         try:
-            return self._core_v1.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
+            prev_logs = self._core_v1.read_namespaced_pod_log(
+                name=pod_name, namespace=namespace, tail_lines=tail_lines, previous=True
+            )
+            if prev_logs:
+                log_sections.append(f"=== [PREVIOUS CRASHED CONTAINER LOG (Fatal Terminated Session)] ===\n{prev_logs}\n")
         except Exception as e:
-            logger.error("Failed to fetch pod logs for '%s': %s", pod_name, e)
-            return f"Error retrieving logs: {str(e)}"
+            log_sections.append(f"[Previous container logs unavailable: {e}]")
+
+        # 2. Fetch Current Running/Restarting Container Log
+        try:
+            curr_logs = self._core_v1.read_namespaced_pod_log(
+                name=pod_name, namespace=namespace, tail_lines=tail_lines, previous=False
+            )
+            if curr_logs:
+                log_sections.append(f"=== [CURRENT RUNNING CONTAINER LOG (Post-Restart)] ===\n{curr_logs}\n")
+        except Exception as e:
+            log_sections.append(f"[Current container logs unavailable: {e}]")
+
+        # 3. Fetch Kubernetes Warning Events for this Pod
+        try:
+            events = self._core_v1.list_namespaced_event(
+                namespace=namespace,
+                field_selector=f"involvedObject.name={pod_name}"
+            )
+            warning_events = [f"[{e.type}] {e.reason}: {e.message} (x{e.count})" for e in events.items if e.type == "Warning"]
+            if warning_events:
+                log_sections.append(f"=== [KUBERNETES WARNING EVENTS] ===\n" + "\n".join(warning_events))
+        except Exception as e:
+            logger.warning("Could not fetch events for pod '%s': %s", pod_name, e)
+
+        return "\n\n".join(log_sections)
 
     def _restart_pod_sync(self, pod_name: str, namespace: str) -> bool:
         self.initialize()
