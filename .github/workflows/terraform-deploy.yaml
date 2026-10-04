@@ -20,6 +20,26 @@ on:
         options:
           - prd
           - dev
+      deploy_networking:
+        description: 'Phase 1: Deploy Core VNet, 6 Subnets & NAT Gateway'
+        required: true
+        type: boolean
+        default: true
+      deploy_data_layer:
+        description: 'Phase 2: Deploy Key Vault, Storage & Neo4j DB'
+        required: true
+        type: boolean
+        default: false
+      deploy_aks:
+        description: 'Phase 3: Deploy Azure Kubernetes Service (AKS) Cluster'
+        required: true
+        type: boolean
+        default: false
+      deploy_gitops_monitoring:
+        description: 'Phase 4: Deploy ArgoCD & Prometheus Stack'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   id-token: write # Required for Azure Entra ID OIDC authentication
@@ -60,7 +80,7 @@ jobs:
         with:
           scan-type: 'config'
           scan-ref: 'terraform/'
-          exit-code: '0' # Log security vulnerabilities without failing build
+          exit-code: '0'
           severity: 'HIGH,CRITICAL'
 
       - name: Terraform Format Check
@@ -71,17 +91,12 @@ jobs:
       - name: Terraform Init (Azure Blob State Backend)
         run: |
           cd terraform
-          terraform init \
-            -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}" \
-            -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate" \
-            -backend-config="use_oidc=true"
+          terraform init             -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}"             -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}"             -backend-config="container_name=tfstate"             -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate"             -backend-config="use_oidc=true"
 
       - name: Terraform Plan
         run: |
           cd terraform
-          terraform plan -var-file="env/${{ github.event.inputs.environment }}.tfvars" -out=tfplan
+          terraform plan             -var-file="env/${{ github.event.inputs.environment }}.tfvars"             -var="deploy_networking=${{ inputs.deploy_networking }}"             -var="deploy_data_layer=${{ inputs.deploy_data_layer }}"             -var="deploy_aks=${{ inputs.deploy_aks }}"             -var="deploy_gitops_monitoring=${{ inputs.deploy_gitops_monitoring }}"             -out=tfplan
 
       - name: Save Plan Artifact
         uses: actions/upload-artifact@v4
@@ -123,12 +138,7 @@ jobs:
       - name: Terraform Init (Azure Blob State Backend)
         run: |
           cd terraform
-          terraform init \
-            -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}" \
-            -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate" \
-            -backend-config="use_oidc=true"
+          terraform init             -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}"             -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}"             -backend-config="container_name=tfstate"             -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate"             -backend-config="use_oidc=true"
 
       - name: Download Plan Artifact
         uses: actions/download-artifact@v4
@@ -173,14 +183,9 @@ jobs:
       - name: Terraform Init (Azure Blob State Backend)
         run: |
           cd terraform
-          terraform init \
-            -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}" \
-            -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate" \
-            -backend-config="use_oidc=true"
+          terraform init             -backend-config="resource_group_name=rg-aegis-ops-${{ github.event.inputs.environment }}"             -backend-config="storage_account_name=tfstateaegis${{ github.event.inputs.environment }}"             -backend-config="container_name=tfstate"             -backend-config="key=${{ github.event.inputs.environment }}.terraform.tfstate"             -backend-config="use_oidc=true"
 
       - name: Terraform Destroy
         run: |
           cd terraform
-          terraform destroy -var-file="env/${{ github.event.inputs.environment }}.tfvars" -auto-approve
+          terraform destroy             -var-file="env/${{ github.event.inputs.environment }}.tfvars"             -var="deploy_networking=${{ inputs.deploy_networking }}"             -var="deploy_data_layer=${{ inputs.deploy_data_layer }}"             -var="deploy_aks=${{ inputs.deploy_aks }}"             -var="deploy_gitops_monitoring=${{ inputs.deploy_gitops_monitoring }}"             -auto-approve

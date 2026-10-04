@@ -1,0 +1,87 @@
+# ============================================================
+# KubeOps-Aegis: Backend API Microservice Kubernetes Manifest
+# Includes Deployment, ClusterIP Service, Probes & Prometheus Scraping
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-api
+  namespace: aegis-apps
+  labels:
+    app: backend-api
+    tier: backend
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-api
+  template:
+    metadata:
+      labels:
+        app: backend-api
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: backend-api
+          image: kubeopsaegisacrprd.azurecr.io/backend-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: ENVIRONMENT
+              value: "production"
+            - name: DATABASE_URL
+              value: "postgresql://aegisadmin:P%40ssw0rdAegis2026!@kubeops-aegis-psql-prd.postgres.database.azure.com:5432/orderdb"
+            - name: AZURE_STORAGE_ACCOUNT_NAME
+              value: "kubeopsaegisstprd"
+            - name: JWT_SECRET
+              value: "aegis-commerce-jwt-secret-key-2026"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: aegis-apps
+  labels:
+    app: backend-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: backend-api

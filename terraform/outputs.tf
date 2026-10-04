@@ -1,29 +1,29 @@
 output "resource_group_name" {
-  value       = azurerm_resource_group.rg.name
+  value       = azurerm_resource_group.rg_compute.name
   description = "The name of the Azure Resource Group"
 }
 
 output "aks_cluster_name" {
-  value       = azurerm_kubernetes_cluster.aks.name
+  value       = try(azurerm_kubernetes_cluster.aks[0].name, "disabled")
   description = "The name of the AKS Cluster"
 }
 
 output "aks_oidc_issuer_url" {
-  value       = azurerm_kubernetes_cluster.aks.oidc_issuer_url
+  value       = try(azurerm_kubernetes_cluster.aks[0].oidc_issuer_url, "disabled")
   description = "OIDC Issuer URL for AKS Workload Identity"
 }
 
 output "acr_login_server" {
-  value       = azurerm_container_registry.acr.login_server
+  value       = try(azurerm_container_registry.acr[0].login_server, "disabled")
   description = "Azure Container Registry Login Server URL"
 }
 
 output "nat_public_ip" {
-  value       = azurerm_public_ip.nat_pip.ip_address
+  value       = try(module.nat_gateway[0].public_ip_address, "disabled")
   description = "Static Public IP attached to Azure NAT Gateway for egress"
 }
 
 output "kubeconfig_command" {
-  value       = "az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing"
+  value       = try("az aks get-credentials --resource-group ${azurerm_resource_group.rg_compute.name} --name ${azurerm_kubernetes_cluster.aks[0].name} --overwrite-existing", "disabled")
   description = "Azure CLI command to configure local kubectl context"
 }

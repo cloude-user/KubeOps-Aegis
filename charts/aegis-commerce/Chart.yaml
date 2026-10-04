@@ -1,0 +1,14 @@
+apiVersion: v2
+name: aegis-commerce
+description: Production 3-Tier E-Commerce Cloud-Native Application for Azure AKS
+type: application
+version: 1.0.0
+appVersion: "2.0.0"
+keywords:
+  - azure
+  - aks
+  - gitops
+  - argocd
+  - ecommerce
+maintainers:
+  - name: KubeOps-Aegis Team

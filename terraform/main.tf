@@ -22,6 +22,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
     }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.14.0"
+    }
   }
 }
 
@@ -60,6 +64,7 @@ resource "azurerm_resource_group" "rg_ops" {
 
 # 2. VNet & Subnets Module
 module "vnet" {
+  count               = var.deploy_networking ? 1 : 0
   source              = "./modules/vnet"
   vnet_name           = "${var.prefix}-vnet-${var.environment}"
   location            = var.location
@@ -70,43 +75,62 @@ module "vnet" {
 
 # 3. NAT Gateway Module
 module "nat_gateway" {
+  count               = var.deploy_networking ? 1 : 0
   source              = "./modules/nat_gateway"
   nat_gateway_name    = "${var.prefix}-nat-gw-${var.environment}"
   location            = var.location
   resource_group_name = azurerm_resource_group.rg_network.name
-  subnet_ids          = [module.vnet.aks_system_subnet_id, module.vnet.aks_user_subnet_id]
+  subnet_ids          = [module.vnet[0].aks_system_subnet_id, module.vnet[0].aks_user_subnet_id]
   tags                = var.tags
 }
 
 # 4. Azure Storage & Private Endpoint Module
 module "storage" {
+  count                      = var.deploy_data_layer && var.deploy_networking ? 1 : 0
   source                     = "./modules/storage"
-  storage_account_name       = "${var.prefix}st${var.environment}"
+  storage_account_name       = "${replace(var.prefix, "-", "")}st${var.environment}" # e.g. kubeopsaegisstprd
   location                   = var.location
   resource_group_name        = azurerm_resource_group.rg_data.name
-  vnet_id                    = module.vnet.vnet_id
-  private_endpoint_subnet_id = module.vnet.private_endpoints_subnet_id
+  vnet_id                    = module.vnet[0].vnet_id
+  private_endpoint_subnet_id = module.vnet[0].private_endpoints_subnet_id
   tags                       = var.tags
 }
 
 # 5. Azure Key Vault & Private Endpoint Module
 module "keyvault" {
+  count                      = var.deploy_data_layer && var.deploy_networking ? 1 : 0
   source                     = "./modules/keyvault"
   keyvault_name              = "${var.prefix}-kv-${var.environment}"
   location                   = var.location
   resource_group_name        = azurerm_resource_group.rg_data.name
-  vnet_id                    = module.vnet.vnet_id
-  private_endpoint_subnet_id = module.vnet.private_endpoints_subnet_id
+  vnet_id                    = module.vnet[0].vnet_id
+  private_endpoint_subnet_id = module.vnet[0].private_endpoints_subnet_id
   tags                       = var.tags
 }
 
-# 6. Neo4j Graph Database Module
+# 6. PostgreSQL Flexible Server Module (Managed DB - ~$15-$25/mo)
+module "postgresql" {
+  count               = var.deploy_data_layer && var.deploy_networking ? 1 : 0
+  source              = "./modules/postgresql"
+  server_name         = "${var.prefix}-psql-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_data.name
+  subnet_id           = module.vnet[0].database_subnet_id
+  vnet_id             = module.vnet[0].vnet_id
+  admin_password      = var.db_password
+  sku_name            = var.db_sku_name
+  postgres_version    = var.db_version
+  tags                = var.tags
+}
+
+# 7. Neo4j Graph Database Module
 module "neo4j" {
-  source               = "./modules/neo4j"
-  neo4j_instance_name  = "${var.prefix}-vm-neo4j-${var.environment}"
-  location             = var.location
-  resource_group_name  = azurerm_resource_group.rg_data.name
-  subnet_id            = module.vnet.neo4j_subnet_id
-  admin_password       = var.db_password
-  tags                 = var.tags
+  count               = var.deploy_data_layer && var.deploy_networking && var.deploy_neo4j ? 1 : 0
+  source              = "./modules/neo4j"
+  neo4j_instance_name = "${var.prefix}-vm-neo4j-${var.environment}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_data.name
+  subnet_id           = module.vnet[0].neo4j_subnet_id
+  admin_password      = var.db_password
+  tags                = var.tags
 }

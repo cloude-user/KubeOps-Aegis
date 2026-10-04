@@ -1,0 +1,58 @@
+name: 🤖 AI PR Code Reviewer Agent
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-code-review:
+    name: 🧠 AI Code & Security Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install AI Dependencies
+        run: |
+          pip install langchain-core langchain-openai langchain-google-genai pydantic pydantic-settings
+
+      - name: Extract PR Git Diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
+          cat pr_diff.txt | head -n 30
+
+      - name: Run AI Code Reviewer Agent
+        id: reviewer
+        env:
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python agent/app/engine/code_reviewer.py pr_diff.txt > pr_review_comment.md
+
+      - name: Post AI Review Comment on GitHub PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reviewBody = fs.readFileSync('pr_review_comment.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🤖 KubeOps-Aegis AI Code Reviewer Report\n\n${reviewBody}`
+            });

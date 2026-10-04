@@ -10,13 +10,38 @@ resource "azurerm_storage_account" "storage" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
-  public_network_access_enabled = false
+  public_network_access_enabled = true
+
+  network_rules {
+    default_action             = "Allow"
+    bypass                     = ["AzureServices"]
+    ip_rules                   = []
+    virtual_network_subnet_ids = []
+  }
 
   tags = var.tags
 }
 
 resource "azurerm_storage_container" "container_rag" {
   name                  = "rag-documents"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "container_media" {
+  name                  = "user-media"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "container_receipts" {
+  name                  = "order-receipts"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "container_incidents" {
+  name                  = "incident-logs"
   storage_account_name  = azurerm_storage_account.storage.name
   container_access_type = "private"
 }

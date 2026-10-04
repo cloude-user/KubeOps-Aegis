@@ -37,6 +37,12 @@ variable "admin_password" {
   sensitive   = true
 }
 
+variable "ssh_public_key" {
+  type        = string
+  description = "SSH Public Key for VM authentication"
+  default     = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3+KubeOpsAegisSecureSSHKey2026AdminAccessExampleKeyForProductionInfrastructurePublicDeployment=="
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags map"

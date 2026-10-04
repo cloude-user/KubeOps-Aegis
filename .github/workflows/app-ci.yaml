@@ -1,0 +1,217 @@
+name: Microservices CI & ACR Build Pipeline
+
+on:
+  push:
+    branches: [ main, feature/networking ]
+    paths:
+      - 'apps/backend/**'
+      - 'apps/frontend/**'
+      - 'agent/**'
+      - 'web/**'
+      - 'Dockerfile'
+      - '.github/workflows/app-ci.yaml'
+  pull_request:
+    branches: [ main, feature/networking ]
+    paths:
+      - 'apps/backend/**'
+      - 'apps/frontend/**'
+      - 'agent/**'
+      - 'web/**'
+      - 'Dockerfile'
+      - '.github/workflows/app-ci.yaml'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Select microservice to build and push'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - backend
+          - frontend
+          - agent
+      custom_tag:
+        description: 'Custom Tag for ACR image (Leave blank for 7-digit short Git commit SHA)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  id-token: write # Required for Azure Entra ID OIDC
+  contents: read
+
+env:
+  ACR_NAME: "kubeopsaegisacrprd"
+  ACR_LOGIN_SERVER: "kubeopsaegisacrprd.azurecr.io"
+
+jobs:
+  # ============================================================
+  # JOB 1: BACKEND PYTEST UNIT TESTS
+  # ============================================================
+  backend-unit-tests:
+    name: 🧪 Run Backend Unit Tests (Pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx
+          pip install -r apps/backend/requirements.txt
+
+      - name: 🚀 Execute Pytest Suite
+        run: |
+          pytest -v apps/backend/tests/test_backend.py
+
+  # ============================================================
+  # JOB 2: RESOLVE IMAGE TAG
+  # ============================================================
+  resolve-tag:
+    name: 🏷️ Resolve Dynamic Image Tag
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tagger.outputs.image_tag }}
+      short_sha: ${{ steps.tagger.outputs.short_sha }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Calculate Tag
+        id: tagger
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          INPUT_TAG="${{ inputs.custom_tag }}"
+
+          if [ -n "$INPUT_TAG" ]; then
+            FINAL_TAG="$INPUT_TAG"
+          else
+            FINAL_TAG="$SHORT_SHA"
+          fi
+
+          echo "image_tag=$FINAL_TAG" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "================================================="
+          echo "Dynamic Image Tag : $FINAL_TAG"
+          echo "Git Short SHA (7) : $SHORT_SHA"
+          echo "Target ACR Server : ${{ env.ACR_LOGIN_SERVER }}"
+          echo "================================================="
+
+  # ============================================================
+  # JOB 3: BACKEND MICROSERVICE BUILD & PUSH
+  # ============================================================
+  build-backend:
+    name: 🐍 Build, Scan & Push Backend API
+    needs: [resolve-tag, backend-unit-tests]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.service == 'all' || inputs.service == 'backend' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      - name: 🚀 Build & Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/backend-api:${{ needs.resolve-tag.outputs.image_tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/backend-api:${{ needs.resolve-tag.outputs.short_sha }}
+            ${{ env.ACR_LOGIN_SERVER }}/backend-api:latest
+
+  # ============================================================
+  # JOB 4: FRONTEND MICROSERVICE BUILD & PUSH
+  # ============================================================
+  build-frontend:
+    name: ⚛️ Build & Push Frontend UI
+    needs: resolve-tag
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.service == 'all' || inputs.service == 'frontend' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      - name: 🚀 Build & Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/frontend-ui:${{ needs.resolve-tag.outputs.image_tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/frontend-ui:${{ needs.resolve-tag.outputs.short_sha }}
+            ${{ env.ACR_LOGIN_SERVER }}/frontend-ui:latest
+
+  # ============================================================
+  # JOB 5: SRE AI AGENT BUILD & PUSH
+  # ============================================================
+  build-agent:
+    name: 🤖 Build & Push SRE AI Agent
+    needs: resolve-tag
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.service == 'all' || inputs.service == 'agent' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      - name: 🚀 Build & Push AI Agent Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/kubeops-aegis-agent:${{ needs.resolve-tag.outputs.image_tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/kubeops-aegis-agent:${{ needs.resolve-tag.outputs.short_sha }}
+            ${{ env.ACR_LOGIN_SERVER }}/kubeops-aegis-agent:latest

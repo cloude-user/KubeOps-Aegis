@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+.terraform
+
 # Distribution / packaging
 .Python
 build/
@@ -151,9 +153,7 @@ activemq-data/
 .env
 .envrc
 .venv
-env/
 venv/
-ENV/
 env.bak/
 venv.bak/
 
@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.terraform/
+
+
+# Terraform Cache, State & Plan Files
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+tfplan

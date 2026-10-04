@@ -1,0 +1,49 @@
+# ============================================================
+# Prometheus Custom Alerting Rules for 3-Tier App & SRE Agent
+# Detects DB Query Timeout, HTTP Timeout & Pod Crashes
+# ============================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: aegis-app-alerts
+  namespace: monitoring
+  labels:
+    app: aegis
+    prometheus: k8s
+spec:
+  groups:
+    - name: aegis_application_alerts
+      rules:
+        # Alert 1: Database Query Timeout Spike
+        - alert: DatabaseQueryTimeoutHigh
+          expr: rate(db_query_timeouts_total[2m]) > 0
+          for: 30s
+          labels:
+            severity: critical
+            team: sre-ops
+          annotations:
+            summary: "High PostgreSQL Query Timeout rate detected in backend-api"
+            description: "Backend microservice experiencing database connection pool exhaustion or query lock timeouts."
+
+        # Alert 2: Downstream HTTP Gateway Timeout
+        - alert: HTTPRequestTimeoutHigh
+          expr: rate(http_request_timeouts_total[2m]) > 0
+          for: 30s
+          labels:
+            severity: warning
+            team: sre-ops
+          annotations:
+            summary: "Downstream HTTP Gateway Timeout detected"
+            description: "Backend API HTTP socket read timeout while calling payment gateway."
+
+        # Alert 3: Pod OOMKilled / CrashLoopBackOff
+        - alert: PodCrashingRepeatedly
+          expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 > 2
+          for: 1m
+          labels:
+            severity: critical
+            team: sre-ops
+          annotations:
+            summary: "Pod {{ $labels.pod }} crashing repeatedly in {{ $labels.namespace }}"
+            description: "Container restart rate exceeded threshold. Likely OOMKilled or unhandled exception."

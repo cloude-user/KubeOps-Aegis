@@ -1,0 +1,27 @@
+# ============================================================
+# ArgoCD GitOps Application Specification
+# Continuous Delivery & Automated Self-Healing Sync for Azure AKS
+# ============================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeops-aegis-workloads
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/cloude-user/KubeOps-Aegis.git'
+    targetRevision: main
+    path: k8s/workloads
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: aegis-apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

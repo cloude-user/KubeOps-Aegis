@@ -3,6 +3,7 @@
 # ============================================================
 
 resource "helm_release" "argocd" {
+  count            = (var.deploy_aks && var.deploy_gitops_monitoring) ? 1 : 0
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
@@ -23,6 +24,16 @@ resource "helm_release" "argocd" {
   set {
     name  = "configs.params.server\\.insecure"
     value = "true"
+  }
+
+  set {
+    name  = "global.tolerations[0].key"
+    value = "CriticalAddonsOnly"
+  }
+
+  set {
+    name  = "global.tolerations[0].operator"
+    value = "Exists"
   }
 
   depends_on = [azurerm_kubernetes_cluster.aks]
