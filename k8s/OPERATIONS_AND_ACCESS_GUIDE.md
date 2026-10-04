@@ -37,6 +37,7 @@ az aks get-credentials \
 kubectl get nodes
 ```
 
+
 ---
 
 ### Step 2: Access ArgoCD GitOps UI
