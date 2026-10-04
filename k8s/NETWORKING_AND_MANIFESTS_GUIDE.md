@@ -5,7 +5,7 @@
 **Region:** Azure East Asia (`eastasia`)  
 **Network Architecture:** Azure CNI Overlay + Cilium eBPF Data Plane + Azure NAT Gateway  
 **Active Workload Namespace:** `aegis-apps`  
-**Git Branch:** `feature/networking`  
+**Git Branch:** `main`  
 
 ---
 

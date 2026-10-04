@@ -10,7 +10,7 @@ To automatically retrieve all cluster URLs and administrative passwords in one s
 
 ```bash
 # In Azure Cloud Shell or Bash:
-curl -sSL https://raw.githubusercontent.com/cloude-user/KubeOps-Aegis/feature/networking/scripts/aks_operations.sh | bash
+curl -sSL https://raw.githubusercontent.com/cloude-user/KubeOps-Aegis/main/scripts/aks_operations.sh | bash
 ```
 
 Or run the local file directly:
