@@ -116,8 +116,9 @@ terraform apply -var-file="env/prd.tfvars" -auto-approve
 # 3. Connect kubectl to AKS Cluster
 $(terraform output -raw kubeconfig_command)
 
-# 4. Deploy 3-Tier Application & SRE Agent
-kubectl apply -f ../k8s/3tier-app/
-kubectl apply -f ../k8s/agent/
-kubectl apply -f ../k8s/argocd/
+# 4. Deploy Enterprise Workloads via ArgoCD GitOps
+kubectl apply -f ../k8s/argocd/application.yaml
+
+# 5. Access Live Application
+kubectl get svc frontend-service -n aegis-apps
 ```
