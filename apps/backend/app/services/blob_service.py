@@ -2,7 +2,10 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from apps.backend.app.config import settings
+try:
+    from backend.app.config import settings
+except ModuleNotFoundError:
+    from apps.backend.app.config import settings
 
 logger = logging.getLogger("backend.blob_service")
 

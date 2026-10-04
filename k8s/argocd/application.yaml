@@ -14,11 +14,11 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/cloude-user/KubeOps-Aegis.git'
-    targetRevision: HEAD
+    targetRevision: feature/networking
     path: k8s/workloads
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: default
+    namespace: aegis-apps
   syncPolicy:
     automated:
       prune: true

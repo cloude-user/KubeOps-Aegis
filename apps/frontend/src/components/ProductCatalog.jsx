@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
-const INITIAL_PRODUCTS = [
+const FALLBACK_PRODUCTS = [
   {
     id: "prod-101",
     title: "Azure AKS Masterclass Handbook",
@@ -36,18 +37,49 @@ const INITIAL_PRODUCTS = [
 ];
 
 export default function ProductCatalog({ onAddToCart }) {
+  const [products, setProducts] = useState(FALLBACK_PRODUCTS);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [isLiveDB, setIsLiveDB] = useState(false);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_BASE_URL}/api/v1/products`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setProducts(data);
+            setIsLiveDB(true);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not connect to live backend API, displaying fallback catalog:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
+
+  const categories = ["All", ...Array.from(new Set(products.map(p => p.category)))];
 
   const filteredProducts = activeCategory === "All"
-    ? INITIAL_PRODUCTS
-    : INITIAL_PRODUCTS.filter(p => p.category === activeCategory);
+    ? products
+    : products.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase());
 
   return (
     <section>
       <div className="section-header">
-        <h3 className="section-title">Featured Products</h3>
+        <div>
+          <h3 className="section-title">Featured Products</h3>
+          <span style={{ fontSize: '0.8rem', color: isLiveDB ? 'var(--accent-green, #00e676)' : 'var(--text-muted)' }}>
+            {isLiveDB ? '● Live Azure PostgreSQL Feed' : '○ Offline Mode'}
+          </span>
+        </div>
         <div className="category-tabs">
-          {["All", "Cloud & DevOps", "Developer Gear"].map(cat => (
+          {categories.map(cat => (
             <button
               key={cat}
               className={`tab-btn ${activeCategory === cat ? 'active' : ''}`}
@@ -59,23 +91,38 @@ export default function ProductCatalog({ onAddToCart }) {
         </div>
       </div>
 
-      <div className="products-grid">
-        {filteredProducts.map(product => (
-          <div key={product.id} className="product-card glass">
-            <img src={product.image_url} alt={product.title} className="product-img" />
-            <div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          Loading live catalog from Azure...
+        </div>
+      ) : (
+        <div className="product-grid">
+          {filteredProducts.map(product => (
+            <div key={product.id} className="product-card glass">
+              <img 
+                src={product.image_url || "https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?w=500&auto=format&fit=crop"} 
+                alt={product.title} 
+                className="product-img" 
+                onError={(e) => {
+                  e.target.src = "https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?w=500&auto=format&fit=crop";
+                }}
+              />
+              <div className="product-category">{product.category}</div>
               <h4 className="product-title">{product.title}</h4>
-              <p className="product-desc">{product.description}</p>
+              <p className="product-desc">{product.description || "Enterprise cloud microservice component."}</p>
+              <div className="product-footer">
+                <span className="product-price">${Number(product.price).toFixed(2)}</span>
+                <button 
+                  className="btn-icon-pill btn-primary"
+                  onClick={() => onAddToCart(product)}
+                >
+                  Add to Cart
+                </button>
+              </div>
             </div>
-            <div className="product-footer">
-              <span className="product-price">${product.price.toFixed(2)}</span>
-              <button className="btn-icon-pill btn-primary" onClick={() => onAddToCart(product)}>
-                + Add to Cart
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

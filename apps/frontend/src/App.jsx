@@ -5,6 +5,7 @@ import ProductCatalog from './components/ProductCatalog';
 import CartDrawer from './components/CartDrawer';
 import EntraAuthModal from './components/EntraAuthModal';
 import ReceiptUploadModal from './components/ReceiptUploadModal';
+import { API_BASE_URL } from './config';
 import './App.css';
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState(null);
 
   const handleAddToCart = (product) => {
     setCart(prevCart => {
@@ -27,9 +29,35 @@ export default function App() {
   };
 
   const handleCheckout = async () => {
-    alert("Checkout completed! Order receipt PDF pushed to Azure Blob Storage.");
-    setCart([]);
-    setIsCartOpen(false);
+    try {
+      const orderPayload = {
+        user_id: user ? user.id : "usr-guest-001",
+        items: cart.map(item => ({
+          product_id: item.id,
+          quantity: item.quantity,
+          unit_price: Number(item.price)
+        })),
+        shipping_address: "100 Cloud Architecture Blvd, Azure East Asia Region"
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Checkout failed with status ${res.status}`);
+      }
+
+      const orderData = await res.json();
+      setCart([]);
+      setIsCartOpen(false);
+      setCheckoutStatus(orderData);
+    } catch (err) {
+      console.error("Checkout error:", err);
+      alert(`Checkout failed: ${err.message}. (Backend may be offline)`);
+    }
   };
 
   return (
@@ -43,6 +71,23 @@ export default function App() {
           onOpenAuth={() => setIsAuthOpen(true)}
           onOpenReceipt={() => setIsReceiptOpen(true)}
         />
+
+        {checkoutStatus && (
+          <div style={{ margin: '20px auto', maxWidth: '800px', padding: '16px 20px', background: 'rgba(0, 230, 118, 0.1)', border: '1px solid rgba(0, 230, 118, 0.3)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 800, color: 'var(--accent-green, #00e676)' }}>🎉 Order Confirmed: {checkoutStatus.id}</div>
+              <div style={{ fontSize: '0.85rem', color: '#ccc', marginTop: '4px' }}>
+                Total: <strong>${Number(checkoutStatus.total_amount).toFixed(2)}</strong> | Saved to PostgreSQL
+              </div>
+            </div>
+            <button 
+              onClick={() => setCheckoutStatus(null)} 
+              style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         <main>
           <HeroBanner />

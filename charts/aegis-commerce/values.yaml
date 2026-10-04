@@ -1,0 +1,124 @@
+# ============================================================
+# Aegis Commerce: Helm Chart Configuration Values
+# ============================================================
+
+global:
+  environment: "production"
+  # Default tolerations to schedule on Azure AKS system node
+  tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+# ------------------------------------------------------------
+# Backend Microservice Configuration
+# ------------------------------------------------------------
+backend:
+  enabled: true
+  name: backend-api
+  replicaCount: 2
+  image:
+    repository: kubeopsaegisacrprd.azurecr.io/backend-api
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+
+  env:
+    databaseUrl: "postgresql://aegisadmin:P%40ssw0rdAegis2026!@kubeops-aegis-psql-prd.postgres.database.azure.com:5432/orderdb"
+    azureStorageAccountName: "kubeopsaegisstprd"
+    jwtSecret: "aegis-commerce-jwt-secret-key-2026"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  probes:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 15
+      periodSeconds: 10
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+  monitoring:
+    scrape: "true"
+    port: "8000"
+    path: "/metrics"
+
+# ------------------------------------------------------------
+# Frontend UI Configuration
+# ------------------------------------------------------------
+frontend:
+  enabled: true
+  name: frontend-ui
+  replicaCount: 2
+  image:
+    repository: kubeopsaegisacrprd.azurecr.io/frontend-ui
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 80
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+  probes:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+# ------------------------------------------------------------
+# Horizontal Pod Autoscaler (HPA v2)
+# ------------------------------------------------------------
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+
+# ------------------------------------------------------------
+# Ingress Controller Configuration (Layer-7 Routing)
+# ------------------------------------------------------------
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+  hosts:
+    - host: ""
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: backend-service
+          servicePort: 80
+        - path: /
+          pathType: Prefix
+          serviceName: frontend-service
+          servicePort: 80
+
