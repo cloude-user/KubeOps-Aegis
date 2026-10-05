@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: kubeopsaegisacrprd.azurecr.io/kubeops-aegis-agent
   pullPolicy: IfNotPresent
-  tag: "v1.0.1"
+  tag: "v1.0.2"
 
 imagePullSecrets: []
 nameOverride: ""
