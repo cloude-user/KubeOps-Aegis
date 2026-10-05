@@ -14,7 +14,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/cloude-user/KubeOps-Aegis.git'
-    targetRevision: main
+    targetRevision: feat/apps
     path: k8s/workloads
   destination:
     server: 'https://kubernetes.default.svc'
