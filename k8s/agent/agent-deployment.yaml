@@ -68,7 +68,7 @@ spec:
       serviceAccountName: aegis-agent-sa
       containers:
         - name: aegis-agent
-          image: kubeopsaegisacrprd.azurecr.io/kubeops-aegis-agent:latest
+          image: kubeopsaegisacrprd.azurecr.io/kubeops-aegis-agent:v1.0.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
