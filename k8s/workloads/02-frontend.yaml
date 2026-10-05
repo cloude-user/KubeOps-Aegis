@@ -29,7 +29,7 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: frontend-ui
-          image: kubeopsaegisacrprd.azurecr.io/frontend-ui:latest
+          image: kubeopsaegisacrprd.azurecr.io/frontend-ui:v1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 80
