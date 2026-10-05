@@ -50,8 +50,8 @@ resources:
     cpu: 500m
     memory: 512Mi
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: 10m
+    memory: 128Mi
 
 # Tolerations required for single-node AKS cluster with CriticalAddonsOnly taint
 tolerations:
