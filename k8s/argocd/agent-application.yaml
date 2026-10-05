@@ -1,0 +1,30 @@
+# ============================================================
+# ArgoCD GitOps Application Specification for SRE AI Agent
+# Natively deploys and manages charts/aegis-agent via Helm
+# ============================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeops-aegis-agent
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/cloude-user/KubeOps-Aegis.git'
+    targetRevision: feat/apps
+    path: charts/aegis-agent
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: aegis-apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
