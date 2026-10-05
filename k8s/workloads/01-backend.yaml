@@ -33,7 +33,7 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: backend-api
-          image: kubeopsaegisacrprd.azurecr.io/backend-api:latest
+          image: kubeopsaegisacrprd.azurecr.io/backend-api:v1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
