@@ -2,8 +2,8 @@ apiVersion: v2
 name: aegis-agent
 description: Autonomous SRE AI Agent Helm Chart for Azure Kubernetes Service (AKS)
 type: application
-version: 1.0.1
-appVersion: "1.0.1"
+version: 1.0.2
+appVersion: "1.0.2"
 keywords:
   - azure
   - aks

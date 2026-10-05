@@ -2,7 +2,7 @@ name: Microservices CI & ACR Build Pipeline
 
 on:
   push:
-    branches: [ main, feature/networking ]
+    branches: [ main, feature/networking, 'feat/**' ]
     paths:
       - 'apps/backend/**'
       - 'apps/frontend/**'
@@ -11,7 +11,7 @@ on:
       - 'Dockerfile'
       - '.github/workflows/app-ci.yaml'
   pull_request:
-    branches: [ main, feature/networking ]
+    branches: [ main, feature/networking, 'feat/**' ]
     paths:
       - 'apps/backend/**'
       - 'apps/frontend/**'
