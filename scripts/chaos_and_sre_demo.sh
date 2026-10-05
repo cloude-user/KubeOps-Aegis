@@ -42,9 +42,16 @@ discover_endpoints() {
     echo -e "   [Found] Storefront Frontend Public IP: ${GREEN}http://${FRONTEND_IP}${NC}"
   fi
 
-  AGENT_POD=$(kubectl get pods -n ${NAMESPACE} -l ${AGENT_APP_LABEL} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  AGENT_POD=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=aegis-agent -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   if [ -z "$AGENT_POD" ]; then
-    echo -e "${RED}   [Warning] SRE Agent pod not found with label ${AGENT_APP_LABEL} in ${NAMESPACE}${NC}"
+    AGENT_POD=$(kubectl get pods -n ${NAMESPACE} -l app=kubeops-aegis-agent -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  fi
+  if [ -z "$AGENT_POD" ]; then
+    AGENT_POD=$(kubectl get pods -n ${NAMESPACE} --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep "kubeops-aegis-agent" | head -n 1 || true)
+  fi
+
+  if [ -z "$AGENT_POD" ]; then
+    echo -e "${RED}   [Warning] SRE Agent pod not found in ${NAMESPACE}${NC}"
   else
     echo -e "   [Found] SRE Agent Pod: ${GREEN}${AGENT_POD}${NC}"
   fi
